@@ -1,0 +1,23 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data:ro
+      - ./model:/app/model:ro
+      - ./backend/app:/app/app
+    env_file:
+      - .env
+    environment:
+      - DATA_DIR=/app/data
+      - MODEL_DIR=/app/model
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend/src:/app/src
+    depends_on:
+      - backend
