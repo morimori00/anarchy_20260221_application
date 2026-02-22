@@ -29,6 +29,42 @@ FEATURE_COLUMNS = [
     "humidity_x_area",
 ]
 
+# LSTM gas model: 28 temporal features (order must match training checkpoint)
+LSTM_GAS_TEMPORAL_COLS = [
+    "temperature_2m",
+    "relative_humidity_2m",
+    "dew_point_2m",
+    "direct_radiation",
+    "wind_speed_10m",
+    "cloud_cover",
+    "apparent_temperature",
+    "precipitation",
+    "hour_of_day",
+    "minute_of_hour",
+    "day_of_week",
+    "is_weekend",
+    "energy_lag_4",
+    "energy_lag_24",
+    "energy_lag_96",
+    "energy_lag_672",
+    "rolling_mean_96",
+    "rolling_std_96",
+    "rolling_mean_672",
+    "rolling_std_672",
+    "temp_x_area",
+    "humidity_x_area",
+    "hdd",
+    "cdd",
+    "elec_energy_lag_4",
+    "elec_energy_lag_24",
+    "elec_energy_lag_96",
+    "elec_energy_lag_672",
+]
+
+LSTM_GAS_STATIC_COLS = ["grossarea", "floorsaboveground", "building_age"]
+
+LSTM_GAS_SEQ_LENGTH = 48
+
 
 def build_features(
     meter_df: pd.DataFrame,
@@ -121,5 +157,74 @@ def build_features(
 
     # Drop rows with NaN in lag features
     df = df.dropna(subset=["energy_lag_4", "energy_lag_24", "energy_lag_96", "energy_lag_672"])
+
+    return df
+
+
+def build_lstm_gas_features(
+    gas_meter_df: pd.DataFrame,
+    elec_meter_df: pd.DataFrame | None,
+    buildings_df: pd.DataFrame,
+    weather_df: pd.DataFrame,
+    weather_overrides: dict | None = None,
+) -> pd.DataFrame:
+    """Build features for LSTM gas model including cross-utility electricity lags.
+
+    Returns a DataFrame with columns: simscode, readingtime, energy_per_sqft,
+    plus all 28 temporal cols and 3 static cols needed by the LSTM.
+    """
+    # Build standard features from gas meter data
+    df = build_features(gas_meter_df, buildings_df, weather_df, weather_overrides)
+    if df.empty:
+        return df
+
+    # Add cross-utility electricity lag features
+    if elec_meter_df is not None and not elec_meter_df.empty:
+        elec = elec_meter_df.copy()
+        elec = elec.dropna(subset=["simscode"])
+        elec["simscode"] = elec["simscode"].astype(int)
+        elec["readingtime"] = pd.to_datetime(elec["readingtime"], errors="coerce")
+
+        # Join with building metadata to get grossarea
+        bld = buildings_df.copy()
+        bld = bld.dropna(subset=["buildingnumber"])
+        bld["buildingnumber"] = bld["buildingnumber"].astype(int)
+        elec = elec.merge(
+            bld[["buildingnumber", "grossarea"]],
+            left_on="simscode",
+            right_on="buildingnumber",
+            how="left",
+        )
+        elec["grossarea"] = elec["grossarea"].fillna(1)
+        elec["elec_energy_per_sqft"] = elec["readingvalue"] / elec["grossarea"]
+
+        # Compute electricity lags per building
+        elec = elec.sort_values(["simscode", "readingtime"]).reset_index(drop=True)
+        for lag_name, lag_periods in [
+            ("elec_energy_lag_4", 4),
+            ("elec_energy_lag_24", 24),
+            ("elec_energy_lag_96", 96),
+            ("elec_energy_lag_672", 672),
+        ]:
+            elec[lag_name] = elec.groupby("simscode")[
+                "elec_energy_per_sqft"
+            ].shift(lag_periods)
+
+        # Merge electricity lags into gas DataFrame
+        elec_lags = elec[
+            ["simscode", "readingtime",
+             "elec_energy_lag_4", "elec_energy_lag_24",
+             "elec_energy_lag_96", "elec_energy_lag_672"]
+        ].drop_duplicates(subset=["simscode", "readingtime"], keep="last")
+
+        df = df.merge(elec_lags, on=["simscode", "readingtime"], how="left")
+
+    # Fill missing cross-utility features with 0
+    for col in ["elec_energy_lag_4", "elec_energy_lag_24",
+                "elec_energy_lag_96", "elec_energy_lag_672"]:
+        if col not in df.columns:
+            df[col] = 0.0
+        else:
+            df[col] = df[col].fillna(0.0)
 
     return df

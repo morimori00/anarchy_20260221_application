@@ -127,7 +127,7 @@ export default function BuildingDetail() {
               <TabsContent key={u.utility} value={u.utility} />
             ))}
           </Tabs>
-
+            <div hidden>
           <Select value={dateRange} onValueChange={setDateRange}>
             <SelectTrigger size="sm">
               <SelectValue placeholder="Date range" />
@@ -140,6 +140,7 @@ export default function BuildingDetail() {
               ))}
             </SelectContent>
           </Select>
+          </div>
         </div>
 
         {tsLoading ? (
