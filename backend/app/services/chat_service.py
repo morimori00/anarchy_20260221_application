@@ -53,8 +53,8 @@ TOOLS = [
                 "type": "object",
                 "properties": {
                     "buildingNumber": {
-                        "type": "string",
-                        "description": "Building number (e.g. '311')",
+                        "type": "integer",
+                        "description": "Building number (e.g. 311)",
                     },
                     "utility": {
                         "type": "string",
@@ -94,7 +94,7 @@ class ChatService:
             return json.dumps(result)
 
         elif tool_name == "run_prediction":
-            building_number = arguments.get("buildingNumber", "")
+            building_number = int(arguments.get("buildingNumber", 0))
             utility = arguments.get("utility", "ELECTRICITY")
             weather_overrides = arguments.get("weatherOverrides")
             try:

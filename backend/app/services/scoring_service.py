@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class BuildingScore:
-    building_number: str
+    building_number: int
     utility: str
     score: float
     status: str
@@ -61,7 +61,7 @@ class ScoringService:
             residuals = group["residual"]
             latest = group.sort_values("readingtime").iloc[-1]
 
-            self._metrics[utility][str(bn)] = {
+            self._metrics[utility][int(bn)] = {
                 "mean_residual": float(residuals.mean()),
                 "mean_abs_residual": float(residuals.abs().mean()),
                 "std_residual": float(residuals.std()) if len(residuals) > 1 else 0.0,
@@ -138,8 +138,8 @@ class ScoringService:
 
         return scores
 
-    def get_building_detail_scores(self, building_number: str) -> dict:
-        bn = str(building_number)
+    def get_building_detail_scores(self, building_number: int) -> dict:
+        bn = building_number
         by_utility = []
         max_score = 0.0
 

@@ -80,7 +80,7 @@ class PredictionService:
 
     def predict_building(
         self,
-        building_number: str,
+        building_number: int,
         utility: str,
         weather_overrides: dict | None = None,
     ) -> pd.DataFrame:

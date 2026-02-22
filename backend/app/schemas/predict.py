@@ -2,7 +2,7 @@ from pydantic import BaseModel
 
 
 class PredictRequest(BaseModel):
-    buildingNumber: str
+    buildingNumber: int
     utility: str = "ELECTRICITY"
     weatherOverrides: dict | None = None
 

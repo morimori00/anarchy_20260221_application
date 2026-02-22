@@ -20,7 +20,7 @@ async def list_buildings(
 
     result = []
     for b in buildings:
-        bn = str(b["buildingNumber"])
+        bn = b["buildingNumber"]
         sc = score_map.get(bn)
         result.append(
             {
@@ -48,7 +48,7 @@ async def list_buildings(
 
 @router.get("/buildings/{building_number}")
 async def get_building(
-    building_number: str,
+    building_number: int,
     data_service: DataService = Depends(get_data_service),
     scoring_service: ScoringService = Depends(get_scoring_service),
 ):
@@ -66,7 +66,7 @@ async def get_building(
 
 @router.get("/buildings/{building_number}/timeseries")
 async def get_timeseries(
-    building_number: str,
+    building_number: int,
     utility: str = Query("ELECTRICITY"),
     start: str | None = Query(None),
     end: str | None = Query(None),

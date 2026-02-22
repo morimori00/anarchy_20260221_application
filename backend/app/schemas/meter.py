@@ -9,7 +9,7 @@ class TimeSeriesDataPoint(BaseModel):
 
 
 class TimeSeriesResponse(BaseModel):
-    buildingNumber: str
+    buildingNumber: int
     utility: str
     units: str
     resolution: str

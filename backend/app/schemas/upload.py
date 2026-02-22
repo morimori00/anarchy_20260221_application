@@ -20,7 +20,7 @@ class MeterRowInput(BaseModel):
 
 
 class BuildingRowInput(BaseModel):
-    buildingNumber: str
+    buildingNumber: int
     buildingName: str = ""
     squareFeet: float = 0
     yearBuilt: int = 0

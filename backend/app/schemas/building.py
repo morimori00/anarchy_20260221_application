@@ -2,7 +2,7 @@ from pydantic import BaseModel
 
 
 class BuildingMapItem(BaseModel):
-    buildingNumber: str
+    buildingNumber: int
     buildingName: str
     campusName: str
     latitude: float
@@ -19,7 +19,7 @@ class BuildingsResponse(BaseModel):
 
 
 class BuildingDetail(BaseModel):
-    buildingNumber: str
+    buildingNumber: int
     buildingName: str
     formalName: str = ""
     campusName: str = ""

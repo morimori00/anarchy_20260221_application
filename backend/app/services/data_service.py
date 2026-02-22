@@ -13,7 +13,7 @@ class DataService:
         self._buildings: pd.DataFrame = pd.DataFrame()
         self._meter_data: pd.DataFrame = pd.DataFrame()
         self._weather: pd.DataFrame = pd.DataFrame()
-        self._buildings_with_meters: set[str] = set()
+        self._buildings_with_meters: set[int] = set()
         self._load()
 
     def _load(self):
@@ -21,7 +21,7 @@ class DataService:
 
         # Load building metadata
         self._buildings = pd.read_csv(self._data_dir / "building_metadata.csv")
-        self._buildings["buildingnumber"] = self._buildings["buildingnumber"].astype(str)
+        # self._buildings["buildingnumber"] = self._buildings["buildingnumber"].astype(str)
         if "constructiondate" in self._buildings.columns:
             self._buildings["constructiondate"] = pd.to_datetime(
                 self._buildings["constructiondate"], errors="coerce"
@@ -35,7 +35,7 @@ class DataService:
             dfs.append(df)
         if dfs:
             self._meter_data = pd.concat(dfs, ignore_index=True)
-            self._meter_data["simscode"] = self._meter_data["simscode"].astype(str)
+            self._meter_data["simscode"] = self._meter_data["simscode"].astype(int)
             self._meter_data["readingtime"] = pd.to_datetime(
                 self._meter_data["readingtime"], errors="coerce"
             )
@@ -72,7 +72,7 @@ class DataService:
         for _, row in df.iterrows():
             result.append(
                 {
-                    "buildingNumber": str(row["buildingnumber"]),
+                    "buildingNumber": int(row["buildingnumber"]),
                     "buildingName": row.get("buildingname", ""),
                     "campusName": row.get("campusname", ""),
                     "latitude": row["latitude"],
@@ -89,13 +89,13 @@ class DataService:
             )
         return result
 
-    def get_building(self, building_number: str) -> dict | None:
-        df = self._buildings[self._buildings["buildingnumber"] == str(building_number)]
+    def get_building(self, building_number: int) -> dict | None:
+        df = self._buildings[self._buildings["buildingnumber"] == building_number]
         if df.empty:
             return None
         row = df.iloc[0]
         return {
-            "buildingNumber": str(row["buildingnumber"]),
+            "buildingNumber": int(row["buildingnumber"]),
             "buildingName": row.get("buildingname", ""),
             "formalName": row.get("formalname", ""),
             "campusName": row.get("campusname", ""),
@@ -115,18 +115,18 @@ class DataService:
             "longitude": row.get("longitude"),
         }
 
-    def get_building_utilities(self, building_number: str) -> list[str]:
-        mask = self._meter_data["simscode"] == str(building_number)
+    def get_building_utilities(self, building_number: int) -> list[str]:
+        mask = self._meter_data["simscode"] == building_number
         return sorted(self._meter_data.loc[mask, "utility"].unique().tolist())
 
     def get_meter_data(
         self,
-        building_number: str,
+        building_number: int,
         utility: str,
         start: datetime | None = None,
         end: datetime | None = None,
     ) -> pd.DataFrame:
-        mask = (self._meter_data["simscode"] == str(building_number)) & (
+        mask = (self._meter_data["simscode"] == building_number) & (
             self._meter_data["utility"] == utility
         )
         if start:
@@ -137,7 +137,7 @@ class DataService:
 
     def get_aggregated_meter_data(
         self,
-        building_number: str,
+        building_number: int,
         utility: str,
         resolution: str = "hourly",
         start: datetime | None = None,
@@ -187,7 +187,7 @@ class DataService:
 
     def append_meter_data(self, df: pd.DataFrame) -> int:
         df = df.copy()
-        df["simscode"] = df["simscode"].astype(str)
+        df["simscode"] = df["simscode"].astype(int)
         if "readingtime" in df.columns:
             df["readingtime"] = pd.to_datetime(df["readingtime"], errors="coerce")
         self._meter_data = pd.concat([self._meter_data, df], ignore_index=True)
@@ -203,6 +203,6 @@ class DataService:
 
     def append_building_data(self, df: pd.DataFrame) -> int:
         df = df.copy()
-        df["buildingnumber"] = df["buildingnumber"].astype(str)
+        df["buildingnumber"] = df["buildingnumber"].astype(int)
         self._buildings = pd.concat([self._buildings, df], ignore_index=True)
         return len(df)
