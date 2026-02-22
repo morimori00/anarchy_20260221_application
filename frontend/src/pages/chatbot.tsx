@@ -81,11 +81,11 @@ export default function Chatbot() {
   return (
     <div className="flex flex-col items-center justify-between h-[calc(100vh-3.5rem)]">
       <Conversation>
-        <ConversationContent className="p-6 w-[700px]">
+        <ConversationContent className="p-6 min-w-[700px]">
           {messages.length === 0 && !error ? (
             <EmptyState onSuggestionClick={handleSuggestionClick} />
           ) : (
-            <div className="w-[700px]">
+            <div className="min-w-[700px]">
               {messages.map((message) => (
                 <ChatMessageItem key={message.id} message={message} />
               ))}
