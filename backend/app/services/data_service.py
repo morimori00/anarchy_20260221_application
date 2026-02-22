@@ -75,18 +75,18 @@ class DataService:
             result.append(
                 {
                     "buildingNumber": int(row["buildingnumber"]),
-                    "buildingName": row.get("buildingname", ""),
-                    "campusName": row.get("campusname", ""),
-                    "latitude": row["latitude"],
-                    "longitude": row["longitude"],
-                    "grossArea": row.get("grossarea", 0),
+                    "buildingName": str(row.get("buildingname", "")),
+                    "campusName": str(row.get("campusname", "")),
+                    "latitude": float(row["latitude"]),
+                    "longitude": float(row["longitude"]),
+                    "grossArea": float(row.get("grossarea", 0)),
                     "constructionDate": (
                         row["constructiondate"].isoformat()
                         if pd.notna(row.get("constructiondate"))
                         else None
                     ),
-                    "floorsAboveGround": row.get("floorsaboveground", 0),
-                    "floorsBelowGround": row.get("floorsbelowground", 0),
+                    "floorsAboveGround": int(row.get("floorsaboveground", 0)),
+                    "floorsBelowGround": int(row.get("floorsbelowground", 0)),
                 }
             )
         return result
@@ -98,23 +98,23 @@ class DataService:
         row = df.iloc[0]
         return {
             "buildingNumber": int(row["buildingnumber"]),
-            "buildingName": row.get("buildingname", ""),
-            "formalName": row.get("formalname", ""),
-            "campusName": row.get("campusname", ""),
-            "address": row.get("address", ""),
-            "city": row.get("city", ""),
-            "state": row.get("state", ""),
-            "postalCode": row.get("postalcode", ""),
-            "grossArea": row.get("grossarea", 0),
-            "floorsAboveGround": row.get("floorsaboveground", 0),
-            "floorsBelowGround": row.get("floorsbelowground", 0),
+            "buildingName": str(row.get("buildingname", "")),
+            "formalName": str(row.get("formalname", "")),
+            "campusName": str(row.get("campusname", "")),
+            "address": str(row.get("address", "")),
+            "city": str(row.get("city", "")),
+            "state": str(row.get("state", "")),
+            "postalCode": str(row.get("postalcode", "")),
+            "grossArea": float(row.get("grossarea", 0)),
+            "floorsAboveGround": int(row.get("floorsaboveground", 0)),
+            "floorsBelowGround": int(row.get("floorsbelowground", 0)),
             "constructionDate": (
                 row["constructiondate"].isoformat()
                 if pd.notna(row.get("constructiondate"))
                 else None
             ),
-            "latitude": row.get("latitude"),
-            "longitude": row.get("longitude"),
+            "latitude": float(row["latitude"]) if pd.notna(row.get("latitude")) else None,
+            "longitude": float(row["longitude"]) if pd.notna(row.get("longitude")) else None,
         }
 
     def get_building_utilities(self, building_number: int) -> list[str]:
@@ -132,8 +132,10 @@ class DataService:
             self._meter_data["utility"] == utility
         )
         if start:
+            start = pd.Timestamp(start).tz_localize(None) if start.tzinfo else start
             mask &= self._meter_data["readingtime"] >= start
         if end:
+            end = pd.Timestamp(end).tz_localize(None) if end.tzinfo else end
             mask &= self._meter_data["readingtime"] <= end
         return self._meter_data[mask].copy()
 
@@ -179,8 +181,10 @@ class DataService:
     ) -> pd.DataFrame:
         df = self._weather.copy()
         if start:
+            start = pd.Timestamp(start).tz_localize(None) if start.tzinfo else start
             df = df[df["date"] >= start]
         if end:
+            end = pd.Timestamp(end).tz_localize(None) if end.tzinfo else end
             df = df[df["date"] <= end]
         return df
 
