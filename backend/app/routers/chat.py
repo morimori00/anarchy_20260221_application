@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
 from app.dependencies import get_chat_service
@@ -21,9 +21,9 @@ async def chat(
 
     return StreamingResponse(
         event_generator(),
-        media_type="text/plain; charset=utf-8",
+        media_type="text/event-stream",
         headers={
-            "x-vercel-ai-data-stream": "v1",
+            "x-vercel-ai-ui-message-stream": "v1",
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
         },

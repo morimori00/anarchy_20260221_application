@@ -1,48 +1,75 @@
-"""Tests for the chat endpoint (POST /api/chat)."""
+"""Tests for the chat endpoint (POST /api/chat) — v1 UI Message Stream protocol."""
+
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 import httpx
 from httpx import ASGITransport
 
 
+def _parse_sse_events(body: str) -> list[dict | str]:
+    """Parse SSE body into a list of event dicts (or raw '[DONE]' string)."""
+    events = []
+    for line in body.strip().split("\n"):
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith("data: "):
+            payload = line[len("data: "):]
+            if payload == "[DONE]":
+                events.append("[DONE]")
+            else:
+                events.append(json.loads(payload))
+    return events
+
+
 @pytest.mark.asyncio
 async def test_chat_stream_response(test_client):
-    """POST /api/chat returns a streaming response with correct headers."""
+    """POST /api/chat returns a streaming response with v1 headers."""
     response = await test_client.post(
         "/api/chat",
         json={"messages": [{"role": "user", "content": "Hello"}]},
     )
 
     assert response.status_code == 200
-    assert "text/" in response.headers["content-type"]
-    assert response.headers.get("x-vercel-ai-data-stream") == "v1"
+    assert "text/event-stream" in response.headers["content-type"]
+    assert response.headers.get("x-vercel-ai-ui-message-stream") == "v1"
 
 
 @pytest.mark.asyncio
 async def test_chat_message_format(test_client):
-    """Verify the stream contains text deltas and a finish event."""
+    """Verify the stream contains message-start, text-delta, finish, and [DONE]."""
     response = await test_client.post(
         "/api/chat",
         json={"messages": [{"role": "user", "content": "Hello"}]},
     )
 
-    body = response.text
-    lines = [l for l in body.strip().split("\n") if l.strip()]
+    events = _parse_sse_events(response.text)
+    event_types = [e["type"] if isinstance(e, dict) else e for e in events]
 
-    # Should have text deltas (0:) and finish (d:)
-    has_text_delta = any(l.startswith("0:") for l in lines)
-    has_finish = any(l.startswith("d:") for l in lines)
+    assert "message-start" in event_types
+    assert "text-start" in event_types
+    assert "text-delta" in event_types
+    assert "text-end" in event_types
+    assert "finish" in event_types
+    assert "[DONE]" in event_types
 
-    assert has_text_delta, f"No text delta events found in: {lines}"
-    assert has_finish, f"No finish event found in: {lines}"
 
-    # Verify finish event contains finishReason
-    finish_lines = [l for l in lines if l.startswith("d:")]
-    assert len(finish_lines) > 0
-    finish_data = json.loads(finish_lines[-1][2:])
-    assert finish_data["finishReason"] == "stop"
+@pytest.mark.asyncio
+async def test_chat_text_content(test_client):
+    """Verify text-delta events contain the expected streamed text."""
+    response = await test_client.post(
+        "/api/chat",
+        json={"messages": [{"role": "user", "content": "Hello"}]},
+    )
+
+    events = _parse_sse_events(response.text)
+    text_deltas = [e for e in events if isinstance(e, dict) and e.get("type") == "text-delta"]
+
+    assert len(text_deltas) == 2
+    assert text_deltas[0]["delta"] == "Hello "
+    assert text_deltas[1]["delta"] == "world!"
 
 
 @pytest.mark.asyncio
@@ -52,39 +79,7 @@ async def test_chat_empty_messages(test_client):
         "/api/chat",
         json={"messages": []},
     )
-
-    # Should not crash - either 200 with a stream or graceful handling
     assert response.status_code == 200
-
-
-@pytest.mark.asyncio
-async def test_chat_text_content():
-    """Verify text delta events contain the expected streamed text."""
-    mock_svc = MagicMock()
-
-    async def stream_chat(messages):
-        yield '0:"Test response"\n'
-        yield 'd:{"finishReason":"stop"}\n'
-
-    mock_svc.stream_chat = MagicMock(side_effect=stream_chat)
-
-    with (
-        patch("app.dependencies._chat_service", mock_svc),
-        patch("app.dependencies._prediction_service", MagicMock()),
-        patch("app.dependencies.init_services"),
-    ):
-        from app.main import app
-        transport = ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-            response = await client.post(
-                "/api/chat",
-                json={"messages": [{"role": "user", "content": "Test"}]},
-            )
-
-    body = response.text
-    text_lines = [l for l in body.strip().split("\n") if l.startswith("0:")]
-    assert len(text_lines) > 0
-    assert "Test response" in text_lines[0]
 
 
 @pytest.mark.asyncio
@@ -93,13 +88,23 @@ async def test_chat_tool_events():
     mock_svc = MagicMock()
 
     async def stream_chat(messages):
-        yield '0:"Let me check."\n'
-        tool_call = {"toolCallId": "tc-1", "toolName": "execute_python", "args": {"code": "print(42)"}}
-        yield f'9:{json.dumps(tool_call)}\n'
-        tool_result = {"toolCallId": "tc-1", "result": {"stdout": "42\n", "stderr": "", "exitCode": 0, "images": []}}
-        yield f'a:{json.dumps(tool_result)}\n'
-        yield '0:"The answer is 42."\n'
-        yield 'd:{"finishReason":"stop"}\n'
+        yield 'data: {"type":"message-start","messageId":"msg-1"}\n\n'
+        yield 'data: {"type":"text-start","textId":"t-1"}\n\n'
+        yield 'data: {"type":"text-delta","textId":"t-1","delta":"Let me check."}\n\n'
+        yield 'data: {"type":"text-end","textId":"t-1"}\n\n'
+        yield 'data: {"type":"start-step"}\n\n'
+        tc = {"type": "tool-input-start", "toolCallId": "tc-1", "toolName": "execute_python"}
+        yield f"data: {json.dumps(tc)}\n\n"
+        ti = {"type": "tool-input-available", "toolCallId": "tc-1", "input": {"code": "print(42)"}}
+        yield f"data: {json.dumps(ti)}\n\n"
+        to = {"type": "tool-output-available", "toolCallId": "tc-1", "output": {"stdout": "42\n", "stderr": "", "exitCode": 0, "images": []}}
+        yield f"data: {json.dumps(to)}\n\n"
+        yield 'data: {"type":"finish-step"}\n\n'
+        yield 'data: {"type":"text-start","textId":"t-2"}\n\n'
+        yield 'data: {"type":"text-delta","textId":"t-2","delta":"The answer is 42."}\n\n'
+        yield 'data: {"type":"text-end","textId":"t-2"}\n\n'
+        yield 'data: {"type":"finish"}\n\n'
+        yield "data: [DONE]\n\n"
 
     mock_svc.stream_chat = MagicMock(side_effect=stream_chat)
 
@@ -116,23 +121,52 @@ async def test_chat_tool_events():
                 json={"messages": [{"role": "user", "content": "Run code"}]},
             )
 
-    body = response.text
-    lines = [l for l in body.strip().split("\n") if l.strip()]
+    events = _parse_sse_events(response.text)
+    event_types = [e["type"] if isinstance(e, dict) else e for e in events]
 
-    has_tool_call = any(l.startswith("9:") for l in lines)
-    has_tool_result = any(l.startswith("a:") for l in lines)
+    assert "tool-input-start" in event_types
+    assert "tool-input-available" in event_types
+    assert "tool-output-available" in event_types
+    assert "start-step" in event_types
+    assert "finish-step" in event_types
 
-    assert has_tool_call, f"No tool call event found in: {lines}"
-    assert has_tool_result, f"No tool result event found in: {lines}"
+    # Verify tool input content
+    tool_input = next(e for e in events if isinstance(e, dict) and e.get("type") == "tool-input-available")
+    assert tool_input["input"]["code"] == "print(42)"
 
-    # Verify tool call content
-    tc_lines = [l for l in lines if l.startswith("9:")]
-    tc_data = json.loads(tc_lines[0][2:])
-    assert tc_data["toolName"] == "execute_python"
-    assert tc_data["args"]["code"] == "print(42)"
+    # Verify tool output content
+    tool_output = next(e for e in events if isinstance(e, dict) and e.get("type") == "tool-output-available")
+    assert tool_output["output"]["stdout"] == "42\n"
+    assert tool_output["output"]["exitCode"] == 0
 
-    # Verify tool result content
-    tr_lines = [l for l in lines if l.startswith("a:")]
-    tr_data = json.loads(tr_lines[0][2:])
-    assert tr_data["result"]["stdout"] == "42\n"
-    assert tr_data["result"]["exitCode"] == 0
+
+@pytest.mark.asyncio
+async def test_chat_error_event():
+    """Verify error events are streamed correctly."""
+    mock_svc = MagicMock()
+
+    async def stream_chat(messages):
+        yield 'data: {"type":"message-start","messageId":"msg-err"}\n\n'
+        yield 'data: {"type":"error","error":"LLM API error: rate limit"}\n\n'
+        yield 'data: {"type":"finish"}\n\n'
+        yield "data: [DONE]\n\n"
+
+    mock_svc.stream_chat = MagicMock(side_effect=stream_chat)
+
+    with (
+        patch("app.dependencies._chat_service", mock_svc),
+        patch("app.dependencies._prediction_service", MagicMock()),
+        patch("app.dependencies.init_services"),
+    ):
+        from app.main import app
+        transport = ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
+                "/api/chat",
+                json={"messages": [{"role": "user", "content": "Test"}]},
+            )
+
+    events = _parse_sse_events(response.text)
+    error_events = [e for e in events if isinstance(e, dict) and e.get("type") == "error"]
+    assert len(error_events) == 1
+    assert "rate limit" in error_events[0]["error"]

@@ -74,6 +74,7 @@ class PredictionService:
         X = df[FEATURE_COLUMNS].values
         model = self._models[utility]
         df["predicted"] = self._predict(model, X)
+        print(f"Predicted values: {df['predicted'].head()}")
         df["residual"] = df["energy_per_sqft"] - df["predicted"]
 
         return df

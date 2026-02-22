@@ -1,5 +1,3 @@
-import json
-
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.dependencies import get_prediction_service
@@ -38,11 +36,15 @@ async def predict(
     mae = float(residuals.abs().mean())
     mean_residual = float(residuals.mean())
 
-    sample = df.tail(20)[["readingtime", "energy_per_sqft", "predicted", "residual"]].copy()
+    sample = df.tail(20)[
+        ["readingtime", "energy_per_sqft", "predicted", "residual"]
+    ].copy()
     sample["readingtime"] = sample["readingtime"].astype(str)
     predictions = sample.to_dict("records")
 
     return PredictResponse(
+        buildingNumber=request.buildingNumber,
+        utility=request.utility,
         predictions=predictions,
         anomalyScore=round(anomaly_score, 6),
         metrics={

@@ -1,6 +1,6 @@
 export function MapLoader() {
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-4">
+    <div className="flex flex-col items-center justify-center h-[500px] gap-4">
       <svg
         width="120"
         height="120"
@@ -116,7 +116,7 @@ export function MapLoader() {
 
 export function BuildingLoader() {
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-4">
+    <div className="flex flex-col items-center justify-center h-[500px] gap-4">
       <svg
         width="100"
         height="120"

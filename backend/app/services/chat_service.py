@@ -1,4 +1,10 @@
-"""Chat service - LLM orchestration with SSE streaming."""
+"""Chat service - LLM orchestration with tool execution and SSE streaming.
+
+Produces a Vercel AI SDK UI Message Stream (v1) — each yield is one
+``data: {json}\\n\\n`` SSE frame.
+"""
+
+import asyncio
 import json
 import logging
 from collections.abc import AsyncGenerator
@@ -6,32 +12,54 @@ from collections.abc import AsyncGenerator
 from openai import AsyncOpenAI
 
 from app.services.code_execution_service import CodeExecutionService
-from app.services.prediction_service import PredictionService
+from app.services.prediction_service import (
+    PredictionService,
+    BuildingDataNotFoundError,
+    InsufficientDataError,
+    ModelNotAvailableError,
+)
+from app.utils import stream_builder as sse
 
 logger = logging.getLogger(__name__)
 
 MAX_TOOL_ITERATIONS = 5
+STEP_TIMEOUT = 60  # seconds per LLM call + tool execution
 
-SYSTEM_PROMPT = """You are an energy analysis assistant for Ohio State University campus buildings.
+SYSTEM_PROMPT = """\
+You are an Energy Analysis Assistant for Ohio State University's campus buildings.
 
 Available data:
-- 287 buildings with meter data (electricity, gas, steam, heat, cooling, etc.)
-- 60 days of 15-minute interval meter readings (September-October 2025)
-- Hourly weather data for the same period
-- XGBoost anomaly detection model for energy consumption
+- Meter readings for 287 buildings across 8 utility types (Sept-Oct 2025, 15-min intervals)
+- Building metadata (1,287 buildings with location, area, floors, construction date)
+- Weather data (hourly observations for Sept-Oct 2025)
+- XGBoost prediction model trained on weather + building features to predict energy_per_sqft
 
-You can use these tools:
-1. execute_python: Run Python code with access to pandas, numpy, matplotlib, seaborn, scipy, xgboost. Data files are in the DATA_DIR directory (/app/data/): building_metadata.csv, meter-data-sept-2025.csv, meter-data-oct-2025.csv, weather-sept-oct-2025.csv
-2. run_prediction: Run the XGBoost prediction model for a specific building and utility type
+When answering questions, use the available tools to query data and run analyses.
+Show your work by executing Python code when doing calculations.
+Use the prediction model when asked about hypothetical scenarios.
+Always explain your findings clearly and note limitations of the 60-day data window.
 
-Always explain your analysis approach and findings clearly. Use charts and visualizations when appropriate."""
+Data files are at /app/data/. In Python code, use the pre-loaded `data` object:
+- data.data_dir  → "/app/data"
+- data.meter_sept → "/app/data/meter-data-sept-2025.csv"
+- data.meter_oct  → "/app/data/meter-data-oct-2025.csv"
+- data.buildings  → "/app/data/building_metadata.csv"
+- data.weather    → "/app/data/weather-sept-oct-2025.csv"
+
+Libraries available: pandas (pd), numpy (np), matplotlib.pyplot (plt), seaborn (sns), scipy, xgboost.
+Use plt.show() (not plt.savefig()) for charts — figures are captured automatically."""
 
 TOOLS = [
     {
         "type": "function",
         "function": {
             "name": "execute_python",
-            "description": "Execute Python code for data analysis. Libraries available: pandas (pd), numpy (np), matplotlib.pyplot (plt), seaborn (sns), scipy. Data files at /app/data/.",
+            "description": (
+                "Execute Python code for data analysis. "
+                "Libraries available: pandas (pd), numpy (np), matplotlib.pyplot (plt), "
+                "seaborn (sns), scipy, xgboost. "
+                "Data file paths are accessible via the pre-loaded `data` object."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -48,22 +76,26 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "run_prediction",
-            "description": "Run XGBoost energy prediction model for a building. Returns predictions, anomaly score, and model metrics.",
+            "description": (
+                "Run the XGBoost energy prediction model for a specific building. "
+                "Optionally override weather parameters to simulate hypothetical scenarios "
+                '(e.g. "What if temperature was 90°F?").'
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "buildingNumber": {
                         "type": "integer",
-                        "description": "Building number (e.g. 311)",
+                        "description": "Building number (SIMS code), e.g. 311",
                     },
                     "utility": {
                         "type": "string",
-                        "description": "Utility type (ELECTRICITY, GAS, STEAM, HEAT, COOLING)",
+                        "description": "Utility type: ELECTRICITY, GAS, STEAM, HEAT, or COOLING. Default: ELECTRICITY",
                         "default": "ELECTRICITY",
                     },
                     "weatherOverrides": {
                         "type": "object",
-                        "description": "Optional weather overrides for scenario analysis",
+                        "description": 'Optional weather feature overrides, e.g. {"temperature_2m": 90.0}',
                     },
                 },
                 "required": ["buildingNumber"],
@@ -86,156 +118,235 @@ class ChatService:
         self._code_service = code_execution_service
         self._prediction_service = prediction_service
 
-    def _execute_tool(self, tool_name: str, arguments: dict) -> str:
-        """Execute a tool call and return the result as a JSON string."""
+    # ── tool execution ──────────────────────────────────────────────
+
+    async def _execute_tool(self, tool_name: str, arguments: dict) -> dict:
+        """Execute a tool call asynchronously and return the result dict."""
         if tool_name == "execute_python":
             code = arguments.get("code", "")
-            result = self._code_service.execute(code)
-            return json.dumps(result)
+            return await asyncio.to_thread(self._code_service.execute, code)
 
-        elif tool_name == "run_prediction":
+        if tool_name == "run_prediction":
             building_number = int(arguments.get("buildingNumber", 0))
             utility = arguments.get("utility", "ELECTRICITY")
             weather_overrides = arguments.get("weatherOverrides")
             try:
-                df = self._prediction_service.predict_building(
-                    building_number, utility, weather_overrides
+                df = await asyncio.to_thread(
+                    self._prediction_service.predict_building,
+                    building_number,
+                    utility,
+                    weather_overrides,
                 )
-                # Compute summary metrics
                 residuals = df["residual"]
                 anomaly_score = float(residuals.abs().mean())
-                rmse = float((residuals ** 2).mean() ** 0.5)
+                rmse = float((residuals**2).mean() ** 0.5)
                 mae = float(residuals.abs().mean())
                 mean_residual = float(residuals.mean())
 
-                # Return last 10 predictions as sample
-                sample = df.tail(10)[["readingtime", "energy_per_sqft", "predicted", "residual"]].copy()
+                sample = df.tail(10)[
+                    ["readingtime", "energy_per_sqft", "predicted", "residual"]
+                ].copy()
                 sample["readingtime"] = sample["readingtime"].astype(str)
-                predictions = sample.to_dict("records")
 
-                result = {
-                    "predictions": predictions,
+                return {
+                    "buildingNumber": building_number,
+                    "utility": utility,
+                    "predictions": sample.to_dict("records"),
                     "anomalyScore": round(anomaly_score, 6),
                     "metrics": {
                         "rmse": round(rmse, 6),
                         "mae": round(mae, 6),
                         "meanResidual": round(mean_residual, 6),
                     },
+                    "summary": (
+                        f"Building {building_number} ({utility}): "
+                        f"anomaly score {anomaly_score:.4f}, "
+                        f"RMSE {rmse:.4f}, MAE {mae:.4f}"
+                    ),
                 }
-                return json.dumps(result)
+            except (
+                BuildingDataNotFoundError,
+                InsufficientDataError,
+                ModelNotAvailableError,
+            ) as e:
+                return {"error": str(e)}
             except Exception as e:
-                return json.dumps({"error": str(e)})
+                return {"error": f"Prediction failed: {e}"}
 
-        return json.dumps({"error": f"Unknown tool: {tool_name}"})
+        return {"error": f"Unknown tool: {tool_name}"}
 
-    async def stream_chat(self, messages: list[dict]) -> AsyncGenerator[str, None]:
-        """Stream chat completion with tool execution, yielding Vercel AI SDK v1 SSE events."""
+    # ── main stream ─────────────────────────────────────────────────
 
-        # Prepend system message
+    async def stream_chat(
+        self, messages: list[dict]
+    ) -> AsyncGenerator[str, None]:
+        """Stream chat completion with tool-use loop.
+
+        Yields Vercel AI SDK UI Message Stream v1 SSE events.
+        """
         full_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
 
-        for iteration in range(MAX_TOOL_ITERATIONS):
-            stream = await self._client.chat.completions.create(
-                model=self._model,
-                messages=full_messages,
-                tools=TOOLS,
-                stream=True,
-            )
+        # Message envelope
+        yield sse.message_start()
 
-            tool_calls_in_progress: dict[int, dict] = {}
+        text_counter = 0
+
+        for _iteration in range(MAX_TOOL_ITERATIONS):
+            # ── call LLM ────────────────────────────────────────
+            try:
+                stream = await asyncio.wait_for(
+                    self._client.chat.completions.create(
+                        model=self._model,
+                        messages=full_messages,
+                        tools=TOOLS,
+                        stream=True,
+                    ),
+                    timeout=STEP_TIMEOUT,
+                )
+            except asyncio.TimeoutError:
+                yield sse.error("LLM request timed out")
+                yield sse.finish()
+                yield sse.done()
+                return
+            except Exception as e:
+                logger.error("LLM API error: %s", e)
+                yield sse.error(f"LLM API error: {e}")
+                yield sse.finish()
+                yield sse.done()
+                return
+
+            # ── stream response chunks ──────────────────────────
+            tool_calls_acc: dict[int, dict] = {}
             has_tool_calls = False
             assistant_content = ""
+            current_text_id: str | None = None
 
-            async for chunk in stream:
-                delta = chunk.choices[0].delta if chunk.choices else None
-                if delta is None:
-                    continue
+            try:
+                async for chunk in stream:
+                    if not chunk.choices:
+                        continue
+                    choice = chunk.choices[0]
+                    delta = choice.delta
+                    finish_reason = choice.finish_reason
+                    if delta is None:
+                        continue
 
-                finish_reason = chunk.choices[0].finish_reason
+                    # Text delta
+                    if delta.content:
+                        assistant_content += delta.content
+                        if current_text_id is None:
+                            text_counter += 1
+                            current_text_id = f"t-{text_counter}"
+                            yield sse.text_start(current_text_id)
+                        yield sse.text_delta(current_text_id, delta.content)
 
-                # Stream text content
-                if delta.content:
-                    assistant_content += delta.content
-                    yield f"0:{json.dumps(delta.content)}\n"
+                    # Accumulate tool-call fragments
+                    if delta.tool_calls:
+                        has_tool_calls = True
+                        for tc in delta.tool_calls:
+                            idx = tc.index
+                            if idx not in tool_calls_acc:
+                                tool_calls_acc[idx] = {
+                                    "id": tc.id or "",
+                                    "name": "",
+                                    "arguments": "",
+                                }
+                            if tc.id:
+                                tool_calls_acc[idx]["id"] = tc.id
+                            if tc.function:
+                                if tc.function.name:
+                                    tool_calls_acc[idx]["name"] = tc.function.name
+                                if tc.function.arguments:
+                                    tool_calls_acc[idx]["arguments"] += (
+                                        tc.function.arguments
+                                    )
 
-                # Accumulate tool calls
-                if delta.tool_calls:
-                    has_tool_calls = True
-                    for tc in delta.tool_calls:
-                        idx = tc.index
-                        if idx not in tool_calls_in_progress:
-                            tool_calls_in_progress[idx] = {
-                                "id": tc.id or "",
-                                "name": "",
-                                "arguments": "",
-                            }
-                        if tc.id:
-                            tool_calls_in_progress[idx]["id"] = tc.id
-                        if tc.function:
-                            if tc.function.name:
-                                tool_calls_in_progress[idx]["name"] = tc.function.name
-                            if tc.function.arguments:
-                                tool_calls_in_progress[idx]["arguments"] += tc.function.arguments
+                    # ── LLM finished with tool calls ────────────
+                    if finish_reason == "tool_calls":
+                        # Close any open text block
+                        if current_text_id is not None:
+                            yield sse.text_end(current_text_id)
+                            current_text_id = None
 
-                # Handle finish
-                if finish_reason == "tool_calls":
-                    # Execute all accumulated tool calls
-                    for idx in sorted(tool_calls_in_progress.keys()):
-                        tc_info = tool_calls_in_progress[idx]
-                        tool_name = tc_info["name"]
-                        try:
-                            args = json.loads(tc_info["arguments"])
-                        except json.JSONDecodeError:
-                            args = {}
+                        yield sse.start_step()
 
-                        # Emit tool call event
-                        tool_call_event = {
-                            "toolCallId": tc_info["id"],
-                            "toolName": tool_name,
-                            "args": args,
-                        }
-                        yield f"9:{json.dumps(tool_call_event)}\n"
-
-                        # Execute tool
-                        tool_result = self._execute_tool(tool_name, args)
-
-                        # Emit tool result event
-                        tool_result_event = {
-                            "toolCallId": tc_info["id"],
-                            "result": json.loads(tool_result),
-                        }
-                        yield f"a:{json.dumps(tool_result_event)}\n"
-
-                        # Add to messages for next iteration
-                        full_messages.append({
-                            "role": "assistant",
-                            "content": assistant_content or None,
-                            "tool_calls": [
+                        # Build ONE assistant message with all tool_calls
+                        assistant_tool_calls = []
+                        for idx in sorted(tool_calls_acc.keys()):
+                            tc_info = tool_calls_acc[idx]
+                            assistant_tool_calls.append(
                                 {
                                     "id": tc_info["id"],
                                     "type": "function",
                                     "function": {
-                                        "name": tool_name,
+                                        "name": tc_info["name"],
                                         "arguments": tc_info["arguments"],
                                     },
                                 }
-                            ],
-                        })
-                        full_messages.append({
-                            "role": "tool",
-                            "tool_call_id": tc_info["id"],
-                            "content": tool_result,
-                        })
+                            )
+                        full_messages.append(
+                            {
+                                "role": "assistant",
+                                "content": assistant_content or None,
+                                "tool_calls": assistant_tool_calls,
+                            }
+                        )
 
-                    # Reset for next iteration
-                    assistant_content = ""
-                    break
+                        # Execute each tool
+                        for idx in sorted(tool_calls_acc.keys()):
+                            tc_info = tool_calls_acc[idx]
+                            tool_name = tc_info["name"]
+                            try:
+                                args = json.loads(tc_info["arguments"])
+                            except json.JSONDecodeError:
+                                args = {}
 
-                if finish_reason == "stop":
-                    break
+                            yield sse.tool_input_start(tc_info["id"], tool_name)
+                            yield sse.tool_input_available(tc_info["id"], args)
 
+                            try:
+                                result = await asyncio.wait_for(
+                                    self._execute_tool(tool_name, args),
+                                    timeout=STEP_TIMEOUT,
+                                )
+                            except asyncio.TimeoutError:
+                                result = {
+                                    "error": f"Tool execution timed out after {STEP_TIMEOUT}s"
+                                }
+
+                            yield sse.tool_output_available(tc_info["id"], result)
+
+                            full_messages.append(
+                                {
+                                    "role": "tool",
+                                    "tool_call_id": tc_info["id"],
+                                    "content": json.dumps(result),
+                                }
+                            )
+
+                        yield sse.finish_step()
+                        assistant_content = ""
+                        break  # loop for next LLM turn
+
+                    # ── LLM finished normally ───────────────────
+                    if finish_reason == "stop":
+                        if current_text_id is not None:
+                            yield sse.text_end(current_text_id)
+                            current_text_id = None
+                        break
+
+            except Exception as e:
+                logger.error("Stream processing error: %s", e)
+                if current_text_id is not None:
+                    yield sse.text_end(current_text_id)
+                yield sse.error(f"Stream error: {e}")
+                yield sse.finish()
+                yield sse.done()
+                return
+
+            # No tool calls → we're done
             if not has_tool_calls:
                 break
 
-        # Emit finish event
-        yield f"d:{json.dumps({'finishReason': 'stop'})}\n"
+        yield sse.finish()
+        yield sse.done()

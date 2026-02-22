@@ -8,6 +8,8 @@ class PredictRequest(BaseModel):
 
 
 class PredictResponse(BaseModel):
+    buildingNumber: int
+    utility: str
     predictions: list[dict]
     anomalyScore: float
     metrics: dict

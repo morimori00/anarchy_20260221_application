@@ -3,17 +3,16 @@ import { Copy, Check, Loader2, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-interface ToolInvocation {
-  toolCallId: string;
+interface ToolInvocationBlockProps {
   toolName: string;
-  args: Record<string, unknown>;
   state: string;
-  result?: Record<string, unknown>;
+  input?: unknown;
+  output?: unknown;
+  errorText?: string;
 }
 
-interface ToolInvocationBlockProps {
-  invocation: ToolInvocation;
-}
+const isLoading = (state: string) =>
+  state === "input-streaming" || state === "input-available";
 
 // ---------------------------------------------------------------------------
 // Copy button
@@ -49,34 +48,45 @@ function CopyButton({ text }: { text: string }) {
 // Python execution block
 // ---------------------------------------------------------------------------
 
-function PythonExecutionBlock({ invocation }: ToolInvocationBlockProps) {
-  const code = (invocation.args?.code as string) ?? "";
-  const result = invocation.result;
-  const isLoading =
-    invocation.state !== "result" && invocation.state !== "output-available";
+function PythonExecutionBlock({
+  state,
+  input,
+  output,
+  errorText,
+}: Omit<ToolInvocationBlockProps, "toolName">) {
+  const code = (input as { code?: string })?.code ?? "";
+  const result = output as {
+    stdout?: string;
+    stderr?: string;
+    exitCode?: number;
+    images?: string[];
+  } | undefined;
+  const loading = isLoading(state);
 
-  const stdout = (result?.stdout as string) ?? "";
-  const stderr = (result?.stderr as string) ?? "";
-  const exitCode = (result?.exitCode as number) ?? 0;
-  const images = (result?.images as string[]) ?? [];
-  const hasError = exitCode !== 0 || !!stderr;
-  const hasOutput = !!stdout || !!stderr || images.length > 0;
+  const stdout = result?.stdout ?? "";
+  const stderr = result?.stderr ?? "";
+  const exitCode = result?.exitCode ?? 0;
+  const images = result?.images ?? [];
+  const hasError = exitCode !== 0 || !!stderr || !!errorText;
+  const hasOutput = !!stdout || !!stderr || images.length > 0 || !!errorText;
 
   return (
     <div className="my-3 rounded-lg overflow-hidden border border-zinc-700">
       {/* Header */}
       <div className="flex items-center justify-between bg-zinc-800 px-4 py-2 rounded-t-lg">
         <span className="text-xs font-medium text-zinc-300">Python</span>
-        <CopyButton text={code} />
+        {code && <CopyButton text={code} />}
       </div>
 
       {/* Code */}
-      <pre className="bg-zinc-950 text-zinc-50 font-mono text-sm p-4 overflow-x-auto whitespace-pre-wrap">
-        {code}
-      </pre>
+      {code && (
+        <pre className="bg-zinc-950 text-zinc-50 font-mono text-sm p-4 overflow-x-auto whitespace-pre-wrap">
+          {code}
+        </pre>
+      )}
 
       {/* Loading state */}
-      {isLoading && (
+      {loading && (
         <div className="flex items-center gap-2 bg-muted px-4 py-3 border-t border-zinc-700">
           <Loader2 className="size-4 animate-spin text-muted-foreground" />
           <span className="text-sm text-muted-foreground">Running...</span>
@@ -84,7 +94,7 @@ function PythonExecutionBlock({ invocation }: ToolInvocationBlockProps) {
       )}
 
       {/* Output */}
-      {!isLoading && hasOutput && (
+      {!loading && hasOutput && (
         <div className="border-t border-zinc-700">
           {stdout && (
             <pre className="bg-muted font-mono text-sm p-4 overflow-x-auto whitespace-pre-wrap">
@@ -92,9 +102,9 @@ function PythonExecutionBlock({ invocation }: ToolInvocationBlockProps) {
             </pre>
           )}
 
-          {hasError && stderr && (
+          {hasError && (stderr || errorText) && (
             <pre className="bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 font-mono text-sm p-4 overflow-x-auto whitespace-pre-wrap">
-              {stderr}
+              {stderr || errorText}
             </pre>
           )}
 
@@ -117,13 +127,19 @@ function PythonExecutionBlock({ invocation }: ToolInvocationBlockProps) {
 // ML Prediction block
 // ---------------------------------------------------------------------------
 
-function PredictionBlock({ invocation }: ToolInvocationBlockProps) {
-  const result = invocation.result;
-  const isLoading =
-    invocation.state !== "result" && invocation.state !== "output-available";
-  const args = invocation.args;
+function PredictionBlock({
+  state,
+  input,
+  output,
+  errorText,
+}: Omit<ToolInvocationBlockProps, "toolName">) {
+  const loading = isLoading(state);
+  const args = input as {
+    buildingNumber?: number;
+    utility?: string;
+  } | undefined;
 
-  if (isLoading) {
+  if (loading) {
     return (
       <Card className="my-3">
         <CardHeader className="pb-3">
@@ -144,7 +160,17 @@ function PredictionBlock({ invocation }: ToolInvocationBlockProps) {
     );
   }
 
-  const error = result?.error as string | undefined;
+  const result = output as {
+    buildingNumber?: number;
+    utility?: string;
+    anomalyScore?: number;
+    metrics?: { rmse?: number; mae?: number; meanResidual?: number };
+    predictions?: Array<Record<string, unknown>>;
+    summary?: string;
+    error?: string;
+  } | undefined;
+
+  const error = result?.error || errorText;
   if (error) {
     return (
       <Card className="my-3 border-red-200 dark:border-red-800">
@@ -161,13 +187,16 @@ function PredictionBlock({ invocation }: ToolInvocationBlockProps) {
     );
   }
 
-  const anomalyScore = result?.anomalyScore as number | undefined;
-  const metrics = result?.metrics as Record<string, number> | undefined;
-  const predictions = result?.predictions as Record<string, unknown>[] | undefined;
+  const anomalyScore = result?.anomalyScore;
+  const metrics = result?.metrics;
+  const predictions = result?.predictions;
+  const buildingNumber = result?.buildingNumber ?? args?.buildingNumber;
+  const utility = result?.utility ?? args?.utility ?? "ELECTRICITY";
 
   const getStatusColor = (score: number) => {
-    if (score < 0.001) return "text-green-600 dark:text-green-400";
+    if (score < 0.001) return "text-emerald-600 dark:text-emerald-400";
     if (score < 0.005) return "text-yellow-600 dark:text-yellow-400";
+    if (score < 0.01) return "text-orange-600 dark:text-orange-400";
     return "text-red-600 dark:text-red-400";
   };
 
@@ -183,15 +212,11 @@ function PredictionBlock({ invocation }: ToolInvocationBlockProps) {
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div>
             <span className="text-muted-foreground">Building:</span>{" "}
-            <span className="font-medium">
-              {String(args?.buildingNumber ?? "")}
-            </span>
+            <span className="font-medium">{String(buildingNumber ?? "")}</span>
           </div>
           <div>
             <span className="text-muted-foreground">Utility:</span>{" "}
-            <span className="font-medium">
-              {(args?.utility as string) ?? "ELECTRICITY"}
-            </span>
+            <span className="font-medium">{utility}</span>
           </div>
           {anomalyScore !== undefined && (
             <div>
@@ -210,6 +235,10 @@ function PredictionBlock({ invocation }: ToolInvocationBlockProps) {
             </div>
           )}
         </div>
+
+        {result?.summary && (
+          <p className="text-xs text-muted-foreground">{result.summary}</p>
+        )}
 
         {predictions && predictions.length > 0 && (
           <div className="overflow-x-auto">
@@ -260,33 +289,52 @@ function PredictionBlock({ invocation }: ToolInvocationBlockProps) {
 // Main export
 // ---------------------------------------------------------------------------
 
-export function ToolInvocationBlock({ invocation }: ToolInvocationBlockProps) {
-  if (invocation.toolName === "execute_python") {
-    return <PythonExecutionBlock invocation={invocation} />;
+export function ToolInvocationBlock({
+  toolName,
+  state,
+  input,
+  output,
+  errorText,
+}: ToolInvocationBlockProps) {
+  if (toolName === "execute_python") {
+    return (
+      <PythonExecutionBlock
+        state={state}
+        input={input}
+        output={output}
+        errorText={errorText}
+      />
+    );
   }
 
-  if (invocation.toolName === "run_prediction") {
-    return <PredictionBlock invocation={invocation} />;
+  if (toolName === "run_prediction") {
+    return (
+      <PredictionBlock
+        state={state}
+        input={input}
+        output={output}
+        errorText={errorText}
+      />
+    );
   }
 
   // Generic fallback
-  const isLoading =
-    invocation.state !== "result" && invocation.state !== "output-available";
+  const loading = isLoading(state);
 
   return (
     <Card className="my-3">
       <CardHeader className="pb-3">
-        <CardTitle className="text-sm">{invocation.toolName ?? "Tool"}</CardTitle>
+        <CardTitle className="text-sm">{toolName ?? "Tool"}</CardTitle>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {loading ? (
           <div className="flex items-center gap-2">
             <Loader2 className="size-4 animate-spin text-muted-foreground" />
             <span className="text-sm text-muted-foreground">Processing...</span>
           </div>
         ) : (
           <pre className="text-xs font-mono whitespace-pre-wrap">
-            {JSON.stringify(invocation.result, null, 2)}
+            {JSON.stringify(output, null, 2)}
           </pre>
         )}
       </CardContent>

@@ -1,18 +1,12 @@
-import {
-  useRef,
-  useEffect,
-  type KeyboardEvent,
-  type ChangeEvent,
-  type FormEvent,
-} from "react";
+import { useRef, useEffect, type KeyboardEvent } from "react";
 import { ArrowUp, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ChatInputProps {
   input: string;
   isStreaming: boolean;
-  onInputChange: (e: ChangeEvent<HTMLTextAreaElement>) => void;
-  onSubmit: (e: FormEvent<HTMLFormElement>) => void;
+  onInputChange: (value: string) => void;
+  onSubmit: () => void;
   onStop: () => void;
 }
 
@@ -36,10 +30,7 @@ export function ChatInput({
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      const form = document.getElementById(
-        "chat-form"
-      ) as HTMLFormElement | null;
-      form?.requestSubmit();
+      onSubmit();
     }
   };
 
@@ -47,14 +38,17 @@ export function ChatInput({
     <div className="border-t p-4">
       <form
         id="chat-form"
-        onSubmit={onSubmit}
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSubmit();
+        }}
         className="max-w-3xl mx-auto flex items-end gap-2"
       >
         <div className="relative flex-1">
           <textarea
             ref={textareaRef}
             value={input}
-            onChange={onInputChange}
+            onChange={(e) => onInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask about energy data..."
             rows={1}
@@ -78,7 +72,7 @@ export function ChatInput({
           <Button
             type="submit"
             size="icon"
-            disabled={(input?.trim() === "")}
+            disabled={input?.trim() === ""}
             className="rounded-full shrink-0"
           >
             <ArrowUp className="size-4" />

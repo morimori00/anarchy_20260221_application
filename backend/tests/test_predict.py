@@ -1,4 +1,5 @@
 """Tests for the predict endpoint (POST /api/predict)."""
+
 import json
 from unittest.mock import MagicMock, patch
 
@@ -24,6 +25,8 @@ async def test_predict_default(test_client):
 
     assert response.status_code == 200
     data = response.json()
+    assert data["buildingNumber"] == 311
+    assert data["utility"] == "ELECTRICITY"
     assert "predictions" in data
     assert "anomalyScore" in data
     assert "metrics" in data
@@ -114,7 +117,9 @@ async def test_predict_default_utility():
             )
 
     assert response.status_code == 200
-    # Verify predict_building was called with ELECTRICITY default
+    data = response.json()
+    assert data["buildingNumber"] == 311
+    assert data["utility"] == "ELECTRICITY"
     mock_pred_svc.predict_building.assert_called_once_with(311, "ELECTRICITY", None)
 
 

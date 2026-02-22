@@ -125,13 +125,17 @@ def mock_prediction_service():
 
 @pytest.fixture
 def mock_chat_service():
-    """Create a mock ChatService that yields a simple SSE stream."""
+    """Create a mock ChatService that yields v1 UI Message Stream SSE events."""
     svc = MagicMock()
 
     async def stream_chat(messages):
-        yield '0:"Hello "\n'
-        yield '0:"world!"\n'
-        yield 'd:{"finishReason":"stop"}\n'
+        yield 'data: {"type":"message-start","messageId":"msg-test"}\n\n'
+        yield 'data: {"type":"text-start","textId":"t-1"}\n\n'
+        yield 'data: {"type":"text-delta","textId":"t-1","delta":"Hello "}\n\n'
+        yield 'data: {"type":"text-delta","textId":"t-1","delta":"world!"}\n\n'
+        yield 'data: {"type":"text-end","textId":"t-1"}\n\n'
+        yield 'data: {"type":"finish"}\n\n'
+        yield "data: [DONE]\n\n"
 
     svc.stream_chat = MagicMock(side_effect=stream_chat)
     return svc
