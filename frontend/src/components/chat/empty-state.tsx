@@ -1,7 +1,7 @@
 import { Sparkles } from "lucide-react";
 
 const SUGGESTIONS = [
-  "Show the top 10 buildings by total electricity consumption in September 2025",
+  "Show the top 10 buildings by total electricity consumption in September 2025. Creat a bar chart to visualize the results. Use log scale for the electricity consumption values.",
   "Run anomaly detection on Building 311 for electricity",
   "Predict Building 0161's electricity usage if temperature were 90°F",
 ];
