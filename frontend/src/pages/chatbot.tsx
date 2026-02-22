@@ -1,9 +1,11 @@
 import { useCallback } from "react";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { useChat } from "@/hooks/use-chat";
 import { EmptyState } from "@/components/chat/empty-state";
 import { ToolInvocationBlock } from "@/components/chat/tool-invocation-block";
+import { Shimmer } from "@/components/ai-elements/shimmer";
 import type { ChatMessage } from "@/types/chat";
 import {
   Conversation,
@@ -77,16 +79,28 @@ export default function Chatbot() {
   );
 
   return (
-    <div className="flex flex-col h-[calc(100vh-3.5rem)]">
+    <div className="flex flex-col items-center justify-between h-[calc(100vh-3.5rem)]">
       <Conversation>
         <ConversationContent className="p-6">
           {messages.length === 0 && !error ? (
             <EmptyState onSuggestionClick={handleSuggestionClick} />
           ) : (
-            <div className="max-w-3xl mx-auto space-y-4">
+            <div className="w-[700px]">
               {messages.map((message) => (
                 <ChatMessageItem key={message.id} message={message} />
               ))}
+
+              {/* Thinking indicator */}
+              {status === "submitted" && (
+                <Message from="assistant">
+                  <MessageContent>
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Spinner className="size-4" />
+                      <Shimmer duration={1.5}>Thinking...</Shimmer>
+                    </div>
+                  </MessageContent>
+                </Message>
+              )}
 
               {/* Error display */}
               {error && (
