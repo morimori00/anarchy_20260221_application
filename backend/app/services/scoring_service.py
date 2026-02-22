@@ -30,7 +30,7 @@ class BuildingScore:
     signals: dict = field(default_factory=dict)
 
 
-DEFAULT_THRESHOLDS = {"caution": 0.6, "warning": 0.8, "anomaly": 0.9}
+DEFAULT_THRESHOLDS = {"caution": 0.5, "warning": 0.7, "anomaly": 0.9}
 
 
 def _status_from_score(score: float, thresholds: dict | None = None) -> str:
