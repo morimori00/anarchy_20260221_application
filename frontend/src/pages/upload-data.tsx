@@ -576,7 +576,7 @@ export default function UploadData() {
       <PageHeader title="Upload Data" />
 
       <div className="pb-20">
-          <h1 className="text-xl px-3">Add new meter, weather, or building data via CSV upload, manual entry, or weather API fetch (Open-Meteo).</h1>
+          <h1 className="text-xl px-6">Add new meter, weather, or building data via CSV upload, manual entry, or weather API fetch (Open-Meteo).</h1>
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
