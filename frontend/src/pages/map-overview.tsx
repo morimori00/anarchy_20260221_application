@@ -42,7 +42,7 @@ export default function MapOverview() {
         </Select>
       </PageHeader>
 
-      <div className="flex-1 relative" style={{ height: "calc(100vh - 14rem)" }}>
+      <div className="flex-1 relative w-full" style={{ height: "calc(100vh - 14rem)" }}>
         {loading ? (
           <div className="flex items-center justify-center h-full text-muted-foreground">
             Loading...

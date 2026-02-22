@@ -5,6 +5,7 @@ import {
   MarkerTooltip,
   MarkerPopup,
   MapControls,
+  type MapRef
 } from "@/components/ui/map";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { MAP_CENTER, MAP_ZOOM, getStatusBg } from "@/lib/constants";
@@ -12,6 +13,16 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import type { BuildingMapData } from "@/types/building";
 import type { AnomalyStatus } from "@/types/utility";
+import { useState, useEffect, useRef } from "react";
+
+type StyleKey = keyof typeof styles;
+
+
+const styles = {
+  default: undefined,
+  openstreetmap: "https://tiles.openfreemap.org/styles/bright",
+  openstreetmap3d: "https://tiles.openfreemap.org/styles/liberty",
+};
 
 interface CampusMapProps {
   buildings: BuildingMapData[];
@@ -31,8 +42,38 @@ function formatArea(area: number): string {
 }
 
 export function CampusMap({ buildings, onBuildingClick }: CampusMapProps) {
+  const mapRef = useRef<MapRef>(null);
+  const [style, setStyle] = useState<StyleKey>("default");
+  const selectedStyle = styles[style];
+  const is3D = style === "openstreetmap3d";
+
+  useEffect(() => {
+    mapRef.current?.easeTo({ pitch: is3D ? 60 : 0, duration: 500 });
+  }, [is3D]);
+
   return (
-    <Map center={MAP_CENTER} zoom={MAP_ZOOM}>
+    <div className="w-full h-[800px]">
+    <Map 
+      ref={mapRef}
+      center={MAP_CENTER}
+      zoom={MAP_ZOOM}
+        styles={
+          selectedStyle
+            ? { light: selectedStyle, dark: selectedStyle }
+            : undefined
+        }
+      >
+      <div className="absolute top-2 right-2 z-10">
+        <select
+          value={style}
+          onChange={(e) => setStyle(e.target.value as StyleKey)}
+          className="bg-background text-foreground border rounded-md px-2 py-1 text-sm shadow"
+        >
+          <option value="default">Default (Carto)</option>
+          <option value="openstreetmap">OpenStreetMap</option>
+          <option value="openstreetmap3d">OpenStreetMap 3D</option>
+        </select>
+      </div>
       <MapControls position="bottom-right" showZoom showFullscreen />
       {buildings.map((building) => {
         const { bg, size } = getMarkerStyles(building.anomalyScore);
@@ -90,5 +131,6 @@ export function CampusMap({ buildings, onBuildingClick }: CampusMapProps) {
         );
       })}
     </Map>
+    </div>
   );
 }
