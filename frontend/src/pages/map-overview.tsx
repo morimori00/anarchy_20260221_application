@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SCORING_METHODS } from "@/lib/constants";
+import { MapLoader } from "@/components/shared/loading-animations";
 
 export default function MapOverview() {
   const [selectedUtility, setSelectedUtility] = useState("ELECTRICITY");
@@ -44,9 +45,7 @@ export default function MapOverview() {
 
       <div className="flex-1 relative w-full" style={{ height: "calc(100vh - 14rem)" }}>
         {loading ? (
-          <div className="flex items-center justify-center h-full text-muted-foreground">
-            Loading...
-          </div>
+          <MapLoader />
         ) : (
           <CampusMap buildings={buildings} onBuildingClick={handleBuildingClick} />
         )}

@@ -128,3 +128,85 @@
     @apply hidden!;
     }
 }
+
+/* Map loader animations */
+@keyframes grid-draw {
+  0% { stroke-dashoffset: 200; opacity: 0; }
+  50% { opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 1; }
+}
+
+@keyframes road-draw {
+  0% { stroke-dashoffset: 300; }
+  100% { stroke-dashoffset: 0; }
+}
+
+@keyframes block-fade {
+  0%, 30% { opacity: 0; transform: scale(0.8); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes pin-bounce {
+  0%, 100% { transform: translate(60px, 52px) translateY(0); }
+  50% { transform: translate(60px, 52px) translateY(-6px); }
+}
+
+@keyframes pin-shadow {
+  0%, 100% { rx: 6; opacity: 0.15; }
+  50% { rx: 4; opacity: 0.08; }
+}
+
+.map-grid-line {
+  stroke-dasharray: 200;
+  stroke-dashoffset: 200;
+  animation: grid-draw 1.5s ease-out forwards;
+}
+
+.map-road {
+  stroke-dasharray: 300;
+  stroke-dashoffset: 300;
+  animation: road-draw 2s ease-in-out forwards;
+}
+
+.map-block {
+  opacity: 0;
+  animation: block-fade 1s ease-out forwards;
+}
+
+.map-pin {
+  animation: pin-bounce 1.8s ease-in-out infinite;
+}
+
+.map-pin-shadow {
+  animation: pin-shadow 1.8s ease-in-out infinite;
+}
+
+/* Building loader animations */
+@keyframes building-reveal {
+  0% { clip-path: inset(100% 0 0 0); }
+  100% { clip-path: inset(0 0 0 0); }
+}
+
+@keyframes window-glow {
+  0%, 100% { fill-opacity: 0.08; }
+  50% { fill-opacity: 0.3; }
+}
+
+@keyframes side-reveal {
+  0% { opacity: 0; transform: translateX(-4px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+.building-body {
+  animation: building-reveal 0.8s ease-out forwards;
+}
+
+.building-window {
+  fill-opacity: 0.08;
+  animation: window-glow 2s ease-in-out infinite;
+}
+
+.building-side {
+  opacity: 0;
+  animation: side-reveal 0.6s ease-out 0.5s forwards;
+}

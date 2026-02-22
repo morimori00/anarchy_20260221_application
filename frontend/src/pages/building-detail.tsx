@@ -17,6 +17,7 @@ import { TimeSeriesChart } from "@/components/building/time-series-chart";
 import { AnomalyDetailTable } from "@/components/building/anomaly-detail-table";
 import { useBuildingDetail } from "@/hooks/use-building-detail";
 import { useTimeSeries } from "@/hooks/use-time-series";
+import { BuildingLoader } from "@/components/shared/loading-animations";
 
 const DATE_RANGES = [
   { value: "7", label: "Last 7 days" },
@@ -62,9 +63,7 @@ export default function BuildingDetail() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full text-muted-foreground">
-        Loading...
-      </div>
+      <BuildingLoader />
     );
   }
 
