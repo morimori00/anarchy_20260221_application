@@ -8,3 +8,4 @@ openai
 httpx
 python-multipart
 pydantic-settings
+matplotlib
