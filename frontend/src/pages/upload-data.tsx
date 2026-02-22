@@ -594,27 +594,31 @@ export default function UploadData() {
         )}
 
         <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList>
-            <TabsTrigger value="meter">Meter Data</TabsTrigger>
-            <TabsTrigger value="weather">Weather Data</TabsTrigger>
-            <TabsTrigger value="building">Building Data</TabsTrigger>
-          </TabsList>
+            <TabsList className="bg-muted">
+            <TabsTrigger value="meter" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Meter Data</TabsTrigger>
+            <TabsTrigger value="weather" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Weather Data</TabsTrigger>
+            <TabsTrigger value="building" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Building Data</TabsTrigger>
+            </TabsList>
 
-          {/* Upload method toggle */}
-          <div className="mt-4">
+            {/* Upload method toggle */}
+            <div className="mt-4">
             <ToggleGroup
               type="single"
               value={uploadMethod}
               onValueChange={handleMethodChange}
-              // variant="outline"
+              variant="outline"
             >
               {methodOptions.map((opt) => (
-                <ToggleGroupItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </ToggleGroupItem>
+              <ToggleGroupItem 
+                key={opt.value} 
+                value={opt.value}
+                className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:border-primary"
+              >
+                {opt.label}
+              </ToggleGroupItem>
               ))}
             </ToggleGroup>
-          </div>
+            </div>
 
           {/* Meter Data Tab */}
           <TabsContent value="meter" className="mt-4 space-y-6">
