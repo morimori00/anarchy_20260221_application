@@ -11,10 +11,24 @@ export const SCORE_THRESHOLDS = {
   anomaly: { max: 1.0, color: "text-red-500", bg: "bg-red-500", label: "Anomaly" },
 } as const;
 
-export function getStatusFromScore(score: number): AnomalyStatus {
-  if (score < 0.3) return "normal";
-  if (score < 0.5) return "caution";
-  if (score < 0.8) return "warning";
+export function getScoreThresholds(thresholds?: { caution: number; warning: number; anomaly: number }) {
+  if (!thresholds) return SCORE_THRESHOLDS;
+  return {
+    normal: { ...SCORE_THRESHOLDS.normal, max: thresholds.caution },
+    caution: { ...SCORE_THRESHOLDS.caution, max: thresholds.warning },
+    warning: { ...SCORE_THRESHOLDS.warning, max: thresholds.anomaly },
+    anomaly: { ...SCORE_THRESHOLDS.anomaly, max: 1.0 },
+  };
+}
+
+export function getStatusFromScore(
+  score: number,
+  thresholds?: { caution: number; warning: number; anomaly: number },
+): AnomalyStatus {
+  const t = thresholds || { caution: 0.3, warning: 0.5, anomaly: 0.8 };
+  if (score < t.caution) return "normal";
+  if (score < t.warning) return "caution";
+  if (score < t.anomaly) return "warning";
   return "anomaly";
 }
 

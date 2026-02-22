@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/hover-card";
 import { SCORING_METHODS } from "@/lib/constants";
 import { MapLoader } from "@/components/shared/loading-animations";
+import { ThresholdSettings } from "@/components/settings/threshold-settings";
 import { HelpCircle } from "lucide-react";
 
 export default function MapOverview() {
@@ -78,6 +79,7 @@ export default function MapOverview() {
               </div>
             </HoverCardContent>
           </HoverCard>
+          <ThresholdSettings />
         </div>
       </PageHeader>
 

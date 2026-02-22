@@ -29,9 +29,11 @@ async def health():
 
 
 from app.routers import buildings, upload, chat, weather, predict  # noqa: E402
+from app.routers import settings as settings_router  # noqa: E402
 
 app.include_router(buildings.router, prefix="/api")
 app.include_router(upload.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
 app.include_router(weather.router, prefix="/api")
 app.include_router(predict.router, prefix="/api")
+app.include_router(settings_router.router, prefix="/api")

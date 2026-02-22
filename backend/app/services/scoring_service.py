@@ -30,12 +30,16 @@ class BuildingScore:
     signals: dict = field(default_factory=dict)
 
 
-def _status_from_score(score: float) -> str:
-    if score < 0.3:
+DEFAULT_THRESHOLDS = {"caution": 0.6, "warning": 0.8, "anomaly": 0.9}
+
+
+def _status_from_score(score: float, thresholds: dict | None = None) -> str:
+    t = thresholds or DEFAULT_THRESHOLDS
+    if score < t["caution"]:
         return "normal"
-    elif score < 0.5:
+    elif score < t["warning"]:
         return "caution"
-    elif score < 0.8:
+    elif score < t["anomaly"]:
         return "warning"
     return "anomaly"
 
@@ -97,10 +101,17 @@ class ScoringService:
     def __init__(self, data_service: DataService, prediction_service: PredictionService):
         self._data_service = data_service
         self._prediction_service = prediction_service
+        self._thresholds: dict = dict(DEFAULT_THRESHOLDS)
         # utility -> buildingNumber -> metrics dict
         self._metrics: dict[str, dict[str, dict]] = {}
         self._available_utilities: list[str] = []
         self._compute_all()
+
+    def get_thresholds(self) -> dict:
+        return dict(self._thresholds)
+
+    def update_thresholds(self, thresholds: dict):
+        self._thresholds = dict(thresholds)
 
     def _compute_all(self):
         for utility in self._prediction_service.get_available_utilities():
@@ -333,7 +344,7 @@ class ScoringService:
                     building_number=bn,
                     utility=utility,
                     score=round(score, 4),
-                    status=_status_from_score(score),
+                    status=_status_from_score(score, self._thresholds),
                     mean_residual=round(m["mean_residual"], 6),
                     mean_abs_residual=round(m["mean_abs_residual"], 6),
                     std_residual=round(m["std_residual"], 6),
@@ -405,14 +416,14 @@ class ScoringService:
                 "utility": utility,
                 "units": units_map.get(utility, "varies"),
                 "score": score,
-                "status": _status_from_score(score),
+                "status": _status_from_score(score, self._thresholds),
                 "latestActual": round(m["latest_actual"], 4),
                 "latestPredicted": round(m["latest_predicted"], 4),
                 "latestDiff": round(m["latest_diff"], 4),
                 "meanResidual": round(m["mean_residual"], 6),
                 "stdResidual": round(m["std_residual"], 6),
                 "investmentScore": inv_score,
-                "investmentStatus": _status_from_score(inv_score),
+                "investmentStatus": _status_from_score(inv_score, self._thresholds),
                 "confidence": confidence,
                 "signals": signals,
             })
@@ -432,9 +443,9 @@ class ScoringService:
 
         return {
             "overallScore": round(max_score, 4),
-            "overallStatus": _status_from_score(max_score),
+            "overallStatus": _status_from_score(max_score, self._thresholds),
             "investmentScore": round(max_inv_score, 4),
-            "investmentStatus": _status_from_score(max_inv_score),
+            "investmentStatus": _status_from_score(max_inv_score, self._thresholds),
             "confidence": overall_confidence,
             "rank": overall_rank or 0,
             "totalBuildings": overall_total,
