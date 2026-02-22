@@ -1,6 +1,6 @@
 import type { AnomalyStatus } from "@/types/utility";
 
-export const MAP_CENTER: [number, number] = [40.0016, -83.0197];
+export const MAP_CENTER: [number, number] = [-83.019707, 40.001633];
 export const MAP_ZOOM = 14;
 
 export const SCORE_THRESHOLDS = {
