@@ -36,6 +36,7 @@ class DataService:
         if dfs:
             self._meter_data = pd.concat(dfs, ignore_index=True)
             print(f"Columns in meter data: {self._meter_data.columns.tolist()}")
+            self._meter_data = self._meter_data.dropna(subset=["simscode"])
             self._meter_data["simscode"] = self._meter_data["simscode"].astype(int)
             self._meter_data["readingtime"] = pd.to_datetime(
                 self._meter_data["readingtime"], errors="coerce"
@@ -204,6 +205,7 @@ class DataService:
 
     def append_building_data(self, df: pd.DataFrame) -> int:
         df = df.copy()
+        df = df.dropna(subset=["buildingnumber"])
         df["buildingnumber"] = df["buildingnumber"].astype(int)
         self._buildings = pd.concat([self._buildings, df], ignore_index=True)
         return len(df)

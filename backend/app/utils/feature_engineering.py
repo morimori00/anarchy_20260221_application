@@ -41,7 +41,9 @@ def build_features(
 
     # Join with building metadata
     bld = buildings_df.copy()
+    bld = bld.dropna(subset=["buildingnumber"])
     bld["buildingnumber"] = bld["buildingnumber"].astype(int)
+    df = df.dropna(subset=["simscode"])
     df["simscode"] = df["simscode"].astype(int)
     df = df.merge(
         bld[["buildingnumber", "grossarea", "floorsaboveground", "constructiondate"]],
