@@ -78,7 +78,7 @@ export function ChatInput({
           <Button
             type="submit"
             size="icon"
-            disabled={!input.trim()}
+            disabled={!(input?.trim())}
             className="rounded-full shrink-0"
           >
             <ArrowUp className="size-4" />

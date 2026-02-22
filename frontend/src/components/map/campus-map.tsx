@@ -43,7 +43,7 @@ function formatArea(area: number): string {
 
 export function CampusMap({ buildings, onBuildingClick }: CampusMapProps) {
   const mapRef = useRef<MapRef>(null);
-  const [style, setStyle] = useState<StyleKey>("default");
+  const [style, setStyle] = useState<StyleKey>("openstreetmap3d");
   const selectedStyle = styles[style];
   const is3D = style === "openstreetmap3d";
 
@@ -56,6 +56,7 @@ export function CampusMap({ buildings, onBuildingClick }: CampusMapProps) {
     <Map 
       ref={mapRef}
       center={MAP_CENTER}
+      pitch={60}
       zoom={MAP_ZOOM}
         styles={
           selectedStyle
