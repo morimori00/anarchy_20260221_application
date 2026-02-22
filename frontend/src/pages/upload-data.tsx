@@ -606,7 +606,7 @@ export default function UploadData() {
               type="single"
               value={uploadMethod}
               onValueChange={handleMethodChange}
-              variant="outline"
+              // variant="outline"
             >
               {methodOptions.map((opt) => (
                 <ToggleGroupItem key={opt.value} value={opt.value}>
