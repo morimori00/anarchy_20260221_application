@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { UtilityIcon } from "@/components/shared/utility-icon";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { ConfidenceBadge } from "@/components/shared/confidence-badge";
 import { getStatusColor } from "@/lib/constants";
 import type { UtilityScore } from "@/types/building";
 
@@ -12,7 +13,7 @@ export function UtilityCards({ utilities }: UtilityCardsProps) {
   return (
     <div className="flex gap-3 overflow-x-auto pb-2">
       {utilities.map((u) => (
-        <Card key={u.utility} className="w-44 flex-shrink-0">
+        <Card key={u.utility} className="w-48 flex-shrink-0">
           <CardContent className="space-y-2">
             <div className="flex items-center gap-2">
               <UtilityIcon utility={u.utility} />
@@ -45,10 +46,17 @@ export function UtilityCards({ utilities }: UtilityCardsProps) {
                   {u.score.toFixed(2)}
                 </span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Investment</span>
+                <span className={`font-medium ${getStatusColor(u.investmentStatus)}`}>
+                  {u.investmentScore.toFixed(2)}
+                </span>
+              </div>
             </div>
 
-            <div className="pt-1">
+            <div className="flex items-center gap-1.5 pt-1">
               <StatusBadge status={u.status} />
+              <ConfidenceBadge level={u.confidence} />
             </div>
           </CardContent>
         </Card>

@@ -10,7 +10,7 @@ router = APIRouter(tags=["buildings"])
 @router.get("/buildings")
 async def list_buildings(
     utility: str = Query("ELECTRICITY"),
-    scoring: str = Query("size_normalized"),
+    scoring: str = Query("multi_signal_weighted"),
     data_service: DataService = Depends(get_data_service),
     scoring_service: ScoringService = Depends(get_scoring_service),
 ):
@@ -32,6 +32,9 @@ async def list_buildings(
                 "grossArea": b["grossArea"],
                 "anomalyScore": sc.score if sc else None,
                 "status": sc.status if sc else "normal",
+                "investmentScore": sc.investment_score if sc else None,
+                "confidence": sc.confidence if sc else "medium",
+                "rank": sc.rank if sc else None,
                 "utilities": data_service.get_building_utilities(bn),
             }
         )

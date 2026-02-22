@@ -1,5 +1,14 @@
 import type { AnomalyStatus, UtilityType } from "./utility";
 
+export type ConfidenceLevel = "high" | "medium" | "low";
+
+export interface SignalDetail {
+  value: number;
+  percentile: number;
+  label: string;
+  description: string;
+}
+
 export interface BuildingMapData {
   buildingNumber: string;
   buildingName: string;
@@ -9,6 +18,9 @@ export interface BuildingMapData {
   grossArea: number;
   anomalyScore: number | null;
   status: AnomalyStatus;
+  investmentScore: number | null;
+  confidence: ConfidenceLevel;
+  rank: number | null;
   utilities: UtilityType[];
 }
 
@@ -48,6 +60,10 @@ export interface UtilityScore {
   latestDiff: number;
   meanResidual: number;
   stdResidual: number;
+  investmentScore: number;
+  investmentStatus: AnomalyStatus;
+  confidence: ConfidenceLevel;
+  signals: Record<string, SignalDetail>;
 }
 
 export interface BuildingDetailResponse {
@@ -55,6 +71,13 @@ export interface BuildingDetailResponse {
   anomaly: {
     overallScore: number;
     overallStatus: AnomalyStatus;
+    investmentScore: number;
+    investmentStatus: AnomalyStatus;
+    confidence: ConfidenceLevel;
+    rank: number;
+    totalBuildings: number;
+    scoresByMethod: Record<string, number>;
+    signals: Record<string, SignalDetail>;
     byUtility: UtilityScore[];
   };
 }

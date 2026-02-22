@@ -11,10 +11,14 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { BuildingInfoCard } from "@/components/building/building-info-card";
-import { AnomalySummaryCard } from "@/components/building/anomaly-summary-card";
+import { ScoreSummaryCard } from "@/components/building/score-summary-card";
+import { InvestmentImpactCard } from "@/components/building/investment-impact-card";
+import { SignalBreakdownCard } from "@/components/building/signal-breakdown-card";
+import { MethodComparisonCard } from "@/components/building/method-comparison-card";
 import { UtilityCards } from "@/components/building/utility-cards";
 import { TimeSeriesChart } from "@/components/building/time-series-chart";
 import { AnomalyDetailTable } from "@/components/building/anomaly-detail-table";
+import { ConfidenceBadge } from "@/components/shared/confidence-badge";
 import { useBuildingDetail } from "@/hooks/use-building-detail";
 import { useTimeSeries } from "@/hooks/use-time-series";
 import { BuildingLoader } from "@/components/shared/loading-animations";
@@ -62,9 +66,7 @@ export default function BuildingDetail() {
   );
 
   if (loading) {
-    return (
-      <BuildingLoader />
-    );
+    return <BuildingLoader />;
   }
 
   if (error || !data) {
@@ -83,7 +85,7 @@ export default function BuildingDetail() {
 
   return (
     <div className="flex flex-col gap-6 p-6">
-      {/* Header */}
+      {/* 1. Header */}
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
           <ArrowLeft className="size-4" />
@@ -91,23 +93,58 @@ export default function BuildingDetail() {
         </Button>
       </div>
 
-      <div>
-        <h1 className="text-2xl font-bold">{building.buildingName}</h1>
-        <p className="text-sm text-muted-foreground">
-          Building {building.buildingNumber}
-        </p>
+      <div className="flex items-center gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">{building.buildingName}</h1>
+          <p className="text-sm text-muted-foreground">
+            Building {building.buildingNumber}
+          </p>
+        </div>
+        {anomaly.rank > 0 && (
+          <span className="px-2 py-1 bg-amber-100 text-amber-800 rounded-md text-sm font-semibold">
+            #{anomaly.rank} of {anomaly.totalBuildings}
+          </span>
+        )}
+        <ConfidenceBadge level={anomaly.confidence} />
       </div>
 
-      {/* Info + Anomaly summary */}
+      {/* 2. Score Summary + Investment Impact (2 columns) */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <BuildingInfoCard building={building} />
-        <AnomalySummaryCard anomaly={anomaly} />
+        <ScoreSummaryCard
+          score={anomaly.overallScore}
+          status={anomaly.overallStatus}
+          rank={anomaly.rank}
+          totalBuildings={anomaly.totalBuildings}
+          confidence={anomaly.confidence}
+          signals={anomaly.signals}
+        />
+        <InvestmentImpactCard
+          investmentScore={anomaly.investmentScore}
+          investmentStatus={anomaly.investmentStatus}
+          grossArea={building.grossArea}
+          overallScore={anomaly.overallScore}
+        />
       </div>
 
-      {/* Utility cards */}
+      {/* 3. Signal Breakdown (full width) */}
+      {Object.keys(anomaly.signals).length > 0 && (
+        <SignalBreakdownCard signals={anomaly.signals} />
+      )}
+
+      {/* 4. Method Comparison (full width) */}
+      {Object.keys(anomaly.scoresByMethod).length > 0 && (
+        <MethodComparisonCard
+          scoresByMethod={anomaly.scoresByMethod}
+          rank={anomaly.rank}
+          totalBuildings={anomaly.totalBuildings}
+        />
+      )}
+
+      {/* 5. Building Info + Utility Cards */}
+      <BuildingInfoCard building={building} />
       <UtilityCards utilities={utilities} />
 
-      {/* Time Series Section */}
+      {/* 6. Time Series Section */}
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <Tabs
@@ -122,7 +159,6 @@ export default function BuildingDetail() {
               ))}
             </TabsList>
 
-            {/* Render empty TabsContent to satisfy Radix requirement */}
             {utilities.map((u) => (
               <TabsContent key={u.utility} value={u.utility} />
             ))}
@@ -158,7 +194,7 @@ export default function BuildingDetail() {
         )}
       </div>
 
-      {/* Anomaly detail table */}
+      {/* 7. Anomaly detail table */}
       {tsData?.data.length ? (
         <div className="space-y-3">
           <h2 className="text-lg font-semibold">Anomaly Details</h2>

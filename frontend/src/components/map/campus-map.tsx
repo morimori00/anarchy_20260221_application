@@ -8,15 +8,14 @@ import {
   type MapRef
 } from "@/components/ui/map";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { ConfidenceBadge } from "@/components/shared/confidence-badge";
 import { MAP_CENTER, MAP_ZOOM, getStatusBg } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import type { BuildingMapData } from "@/types/building";
-import type { AnomalyStatus } from "@/types/utility";
 import { useState, useEffect, useRef } from "react";
 
 type StyleKey = keyof typeof styles;
-
 
 const styles = {
   default: undefined,
@@ -27,6 +26,7 @@ const styles = {
 interface CampusMapProps {
   buildings: BuildingMapData[];
   onBuildingClick: (buildingNumber: string) => void;
+  isInvestmentView?: boolean;
 }
 
 function getMarkerStyles(score: number | null): { bg: string; size: string } {
@@ -37,15 +37,28 @@ function getMarkerStyles(score: number | null): { bg: string; size: string } {
   return { bg: "bg-emerald-500", size: "w-4 h-4" };
 }
 
+function getInvestmentMarkerSize(grossArea: number, allAreas: number[]): string {
+  if (allAreas.length === 0) return "w-5 h-5";
+  const sorted = [...allAreas].sort((a, b) => a - b);
+  const idx = sorted.findIndex((a) => a >= grossArea);
+  const pct = idx / Math.max(sorted.length - 1, 1);
+  if (pct >= 0.75) return "w-8 h-8";
+  if (pct >= 0.5) return "w-6 h-6";
+  if (pct >= 0.25) return "w-5 h-5";
+  return "w-4 h-4";
+}
+
 function formatArea(area: number): string {
   return area.toLocaleString() + " sqft";
 }
 
-export function CampusMap({ buildings, onBuildingClick }: CampusMapProps) {
+export function CampusMap({ buildings, onBuildingClick, isInvestmentView = false }: CampusMapProps) {
   const mapRef = useRef<MapRef>(null);
   const [style, setStyle] = useState<StyleKey>("openstreetmap3d");
   const selectedStyle = styles[style];
   const is3D = style === "openstreetmap3d";
+
+  const allAreas = buildings.map((b) => b.grossArea);
 
   useEffect(() => {
     mapRef.current?.easeTo({ pitch: is3D ? 60 : 0, duration: 500 });
@@ -53,7 +66,7 @@ export function CampusMap({ buildings, onBuildingClick }: CampusMapProps) {
 
   return (
     <div className="w-full h-[800px]">
-    <Map 
+    <Map
       ref={mapRef}
       center={MAP_CENTER}
       pitch={60}
@@ -77,8 +90,13 @@ export function CampusMap({ buildings, onBuildingClick }: CampusMapProps) {
       </div>
       <MapControls position="bottom-right" showZoom showFullscreen />
       {buildings.map((building) => {
-        const { bg, size } = getMarkerStyles(building.anomalyScore);
-        const score = building.anomalyScore ?? 0;
+        const displayScore = isInvestmentView
+          ? (building.investmentScore ?? 0)
+          : (building.anomalyScore ?? 0);
+        const { bg } = getMarkerStyles(displayScore);
+        const size = isInvestmentView
+          ? getInvestmentMarkerSize(building.grossArea, allAreas)
+          : getMarkerStyles(displayScore).size;
 
         return (
           <MapMarker
@@ -94,7 +112,10 @@ export function CampusMap({ buildings, onBuildingClick }: CampusMapProps) {
 
             <MarkerTooltip>
               <div className="text-xs font-medium">{building.buildingName}</div>
-              <div className="text-xs">Score: {score.toFixed(2)}</div>
+              <div className="text-xs">
+                Score: {displayScore.toFixed(2)}
+                {building.rank != null && ` · #${building.rank}`}
+              </div>
             </MarkerTooltip>
 
             <MarkerPopup className="w-64">
@@ -108,10 +129,16 @@ export function CampusMap({ buildings, onBuildingClick }: CampusMapProps) {
 
                 <div className="grid grid-cols-2 gap-y-1.5 text-xs">
                   <span className="text-muted-foreground">Anomaly Score</span>
-                  <span className="font-medium">{score.toFixed(2)}</span>
+                  <span className="font-medium">{(building.anomalyScore ?? 0).toFixed(2)}</span>
+
+                  <span className="text-muted-foreground">Investment Score</span>
+                  <span className="font-medium">{(building.investmentScore ?? 0).toFixed(2)}</span>
 
                   <span className="text-muted-foreground">Gross Area</span>
                   <span className="font-medium">{formatArea(building.grossArea)}</span>
+
+                  <span className="text-muted-foreground">Confidence</span>
+                  <ConfidenceBadge level={building.confidence} />
 
                   <span className="text-muted-foreground">Status</span>
                   <StatusBadge status={building.status} />
