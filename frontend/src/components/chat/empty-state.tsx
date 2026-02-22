@@ -1,9 +1,9 @@
 import { Sparkles } from "lucide-react";
 
 const SUGGESTIONS = [
-  "Which buildings have the highest anomaly scores for electricity?",
-  "Compare energy usage of Building 311 vs Building 356",
-  "What if temperature was 10F higher on Sept 15?",
+  "Show the top 10 buildings by total electricity consumption in September 2025",
+  "Run anomaly detection on Building 311 for electricity",
+  "Predict Building 0161's electricity usage if temperature were 90°F",
 ];
 
 interface EmptyStateProps {
