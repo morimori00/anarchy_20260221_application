@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     data_dir: Path = Path("/app/data")
     model_dir: Path = Path("/app/model")
     openai_api_key: str = ""
-    openai_model: str = "gpt-4o"
+    openai_model: str = "gpt-5-mini-2025-08-07"
     cors_origins: list[str] = ["http://localhost:3000"]
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}

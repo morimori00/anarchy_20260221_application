@@ -3,7 +3,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import xgboost as xgb
+from xgboost import XGBRegressor
 
 from app.services.data_service import DataService
 from app.utils.feature_engineering import FEATURE_COLUMNS, build_features
@@ -26,7 +26,7 @@ class InsufficientDataError(Exception):
 class PredictionService:
     def __init__(self, data_service: DataService, model_dir: Path):
         self._data_service = data_service
-        self._models: dict[str, xgb.Booster] = {}
+        self._models: dict[str, XGBRegressor] = {}
         self._load_models(model_dir)
 
     def _load_models(self, model_dir: Path):
@@ -40,16 +40,15 @@ class PredictionService:
         for filename, utility in model_map.items():
             path = model_dir / filename
             if path.exists():
-                model = xgb.Booster()
+                model = XGBRegressor()
                 model.load_model(str(path))
                 self._models[utility] = model
                 logger.info("Loaded model for %s from %s", utility, path)
 
         logger.info("Models available for: %s", list(self._models.keys()))
 
-    def _predict(self, model: xgb.Booster, X: np.ndarray) -> np.ndarray:
-        dmatrix = xgb.DMatrix(X, feature_names=FEATURE_COLUMNS)
-        return model.predict(dmatrix)
+    def _predict(self, model: XGBRegressor, X: np.ndarray) -> np.ndarray:
+        return model.predict(X)
 
     def predict_all(self, utility: str) -> pd.DataFrame:
         if utility not in self._models:
@@ -74,7 +73,6 @@ class PredictionService:
         X = df[FEATURE_COLUMNS].values
         model = self._models[utility]
         df["predicted"] = self._predict(model, X)
-        print(f"Predicted values: {df['predicted'].head()}")
         df["residual"] = df["energy_per_sqft"] - df["predicted"]
 
         return df

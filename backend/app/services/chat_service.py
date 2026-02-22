@@ -1,7 +1,6 @@
 """Chat service - LLM orchestration with tool execution and SSE streaming.
 
-Produces a Vercel AI SDK UI Message Stream (v1) — each yield is one
-``data: {json}\\n\\n`` SSE frame.
+Produces custom SSE events — each yield is one ``data: {json}\\n\\n`` SSE frame.
 """
 
 import asyncio
@@ -182,17 +181,16 @@ class ChatService:
     ) -> AsyncGenerator[str, None]:
         """Stream chat completion with tool-use loop.
 
-        Yields Vercel AI SDK UI Message Stream v1 SSE events.
+        Yields custom SSE events.
         """
         full_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
 
-        # Message envelope
-        yield sse.message_start()
-
-        text_counter = 0
+        yield sse.metadata()
 
         for _iteration in range(MAX_TOOL_ITERATIONS):
             # ── call LLM ────────────────────────────────────────
+            yield sse.status("thinking")
+
             try:
                 stream = await asyncio.wait_for(
                     self._client.chat.completions.create(
@@ -205,13 +203,11 @@ class ChatService:
                 )
             except asyncio.TimeoutError:
                 yield sse.error("LLM request timed out")
-                yield sse.finish()
                 yield sse.done()
                 return
             except Exception as e:
                 logger.error("LLM API error: %s", e)
                 yield sse.error(f"LLM API error: {e}")
-                yield sse.finish()
                 yield sse.done()
                 return
 
@@ -219,7 +215,6 @@ class ChatService:
             tool_calls_acc: dict[int, dict] = {}
             has_tool_calls = False
             assistant_content = ""
-            current_text_id: str | None = None
 
             try:
                 async for chunk in stream:
@@ -234,11 +229,7 @@ class ChatService:
                     # Text delta
                     if delta.content:
                         assistant_content += delta.content
-                        if current_text_id is None:
-                            text_counter += 1
-                            current_text_id = f"t-{text_counter}"
-                            yield sse.text_start(current_text_id)
-                        yield sse.text_delta(current_text_id, delta.content)
+                        yield sse.text_delta(delta.content)
 
                     # Accumulate tool-call fragments
                     if delta.tool_calls:
@@ -263,13 +254,6 @@ class ChatService:
 
                     # ── LLM finished with tool calls ────────────
                     if finish_reason == "tool_calls":
-                        # Close any open text block
-                        if current_text_id is not None:
-                            yield sse.text_end(current_text_id)
-                            current_text_id = None
-
-                        yield sse.start_step()
-
                         # Build ONE assistant message with all tool_calls
                         assistant_tool_calls = []
                         for idx in sorted(tool_calls_acc.keys()):
@@ -301,8 +285,8 @@ class ChatService:
                             except json.JSONDecodeError:
                                 args = {}
 
-                            yield sse.tool_input_start(tc_info["id"], tool_name)
-                            yield sse.tool_input_available(tc_info["id"], args)
+                            yield sse.tool_start(tc_info["id"], tool_name, args)
+                            yield sse.status("tool-executing", tool_name)
 
                             try:
                                 result = await asyncio.wait_for(
@@ -310,11 +294,26 @@ class ChatService:
                                     timeout=STEP_TIMEOUT,
                                 )
                             except asyncio.TimeoutError:
-                                result = {
-                                    "error": f"Tool execution timed out after {STEP_TIMEOUT}s"
-                                }
+                                yield sse.tool_end(
+                                    tc_info["id"],
+                                    error=f"Tool execution timed out after {STEP_TIMEOUT}s",
+                                )
+                                full_messages.append(
+                                    {
+                                        "role": "tool",
+                                        "tool_call_id": tc_info["id"],
+                                        "content": json.dumps({"error": f"Tool execution timed out after {STEP_TIMEOUT}s"}),
+                                    }
+                                )
+                                continue
 
-                            yield sse.tool_output_available(tc_info["id"], result)
+                            # Check if tool result itself contains an error
+                            if "error" in result:
+                                yield sse.tool_end(
+                                    tc_info["id"], error=result["error"]
+                                )
+                            else:
+                                yield sse.tool_end(tc_info["id"], output=result)
 
                             full_messages.append(
                                 {
@@ -324,23 +323,16 @@ class ChatService:
                                 }
                             )
 
-                        yield sse.finish_step()
                         assistant_content = ""
                         break  # loop for next LLM turn
 
                     # ── LLM finished normally ───────────────────
                     if finish_reason == "stop":
-                        if current_text_id is not None:
-                            yield sse.text_end(current_text_id)
-                            current_text_id = None
                         break
 
             except Exception as e:
                 logger.error("Stream processing error: %s", e)
-                if current_text_id is not None:
-                    yield sse.text_end(current_text_id)
                 yield sse.error(f"Stream error: {e}")
-                yield sse.finish()
                 yield sse.done()
                 return
 
@@ -348,5 +340,4 @@ class ChatService:
             if not has_tool_calls:
                 break
 
-        yield sse.finish()
         yield sse.done()

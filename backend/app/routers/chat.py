@@ -23,7 +23,6 @@ async def chat(
         event_generator(),
         media_type="text/event-stream",
         headers={
-            "x-vercel-ai-ui-message-stream": "v1",
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
         },
