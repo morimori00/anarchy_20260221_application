@@ -109,6 +109,11 @@ def build_features(
     df["temp_x_area"] = df["temperature_2m"] * df["grossarea"]
     df["humidity_x_area"] = df["relative_humidity_2m"] * df["grossarea"]
 
+    # Heating / Cooling Degree values (base 65 °F)
+    HDD_BASE = 65.0
+    df["hdd"] = (HDD_BASE - df["temperature_2m"]).clip(lower=0)
+    df["cdd"] = (df["temperature_2m"] - HDD_BASE).clip(lower=0)
+
     # Fill remaining NaN in features
     df["floorsaboveground"] = df["floorsaboveground"].fillna(1)
     df["rolling_std_96"] = df["rolling_std_96"].fillna(0)

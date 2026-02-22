@@ -11,6 +11,16 @@ from app.utils.feature_engineering import FEATURE_COLUMNS, build_features
 logger = logging.getLogger(__name__)
 
 
+def _get_model_feature_names(model: XGBRegressor) -> list[str] | None:
+    """Extract feature names stored in the XGBoost model."""
+    try:
+        names = model.get_booster().feature_names
+        if names:
+            return names
+    except Exception:
+        pass
+    return None
+
 class ModelNotAvailableError(Exception):
     pass
 
@@ -36,6 +46,7 @@ class PredictionService:
             "model_steam.json": "STEAM",
             "model_heat.json": "HEAT",
             "model_cooling.json": "COOLING",
+            "model_steamrate.json": "STEAMRATE",
         }
         for filename, utility in model_map.items():
             path = model_dir / filename
@@ -65,13 +76,15 @@ class PredictionService:
         if df.empty:
             raise InsufficientDataError("All rows dropped after feature engineering")
 
+        model = self._models[utility]
+        feature_cols = _get_model_feature_names(model) or FEATURE_COLUMNS
+
         # Fill any remaining NaN in feature columns
-        for col in FEATURE_COLUMNS:
+        for col in feature_cols:
             if col in df.columns:
                 df[col] = df[col].fillna(0)
 
-        X = df[FEATURE_COLUMNS].values
-        model = self._models[utility]
+        X = df[feature_cols].values
         df["predicted"] = self._predict(model, X)
         df["residual"] = df["energy_per_sqft"] - df["predicted"]
 
@@ -101,12 +114,14 @@ class PredictionService:
                 f"Insufficient data for building {building_number}"
             )
 
-        for col in FEATURE_COLUMNS:
+        model = self._models[utility]
+        feature_cols = _get_model_feature_names(model) or FEATURE_COLUMNS
+
+        for col in feature_cols:
             if col in df.columns:
                 df[col] = df[col].fillna(0)
 
-        X = df[FEATURE_COLUMNS].values
-        model = self._models[utility]
+        X = df[feature_cols].values
         df["predicted"] = self._predict(model, X)
         df["residual"] = df["energy_per_sqft"] - df["predicted"]
 
