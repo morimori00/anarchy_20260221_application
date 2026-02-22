@@ -132,7 +132,7 @@ export default function Chatbot() {
       </Conversation>
 
       {/* Input area */}
-      <div className="border-t p-4">
+      <div className="border-t p-4 w-[700px]">
         <PromptInput
           className="max-w-3xl mx-auto"
           onSubmit={(message) => {
