@@ -108,42 +108,6 @@ export default function BuildingDetail() {
         <ConfidenceBadge level={anomaly.confidence} />
       </div>
 
-      {/* 2. Score Summary + Investment Impact (2 columns) */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <ScoreSummaryCard
-          score={anomaly.overallScore}
-          status={anomaly.overallStatus}
-          rank={anomaly.rank}
-          totalBuildings={anomaly.totalBuildings}
-          confidence={anomaly.confidence}
-          signals={anomaly.signals}
-        />
-        <InvestmentImpactCard
-          investmentScore={anomaly.investmentScore}
-          investmentStatus={anomaly.investmentStatus}
-          grossArea={building.grossArea}
-          overallScore={anomaly.overallScore}
-        />
-      </div>
-
-      {/* 3. Signal Breakdown (full width) */}
-      {Object.keys(anomaly.signals).length > 0 && (
-        <SignalBreakdownCard signals={anomaly.signals} />
-      )}
-
-      {/* 4. Method Comparison (full width) */}
-      {Object.keys(anomaly.scoresByMethod).length > 0 && (
-        <MethodComparisonCard
-          scoresByMethod={anomaly.scoresByMethod}
-          rank={anomaly.rank}
-          totalBuildings={anomaly.totalBuildings}
-        />
-      )}
-
-      {/* 5. Building Info + Utility Cards */}
-      <BuildingInfoCard building={building} />
-      <UtilityCards utilities={utilities} />
-
       {/* 6. Time Series Section */}
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -193,6 +157,48 @@ export default function BuildingDetail() {
           </div>
         )}
       </div>
+
+      <UtilityCards utilities={utilities} />
+
+
+      {/* 3. Signal Breakdown (full width) */}
+      {Object.keys(anomaly.signals).length > 0 && (
+        <SignalBreakdownCard signals={anomaly.signals} />
+      )}
+
+
+      {/* 2. Score Summary + Investment Impact (2 columns) */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <ScoreSummaryCard
+          score={anomaly.overallScore}
+          status={anomaly.overallStatus}
+          rank={anomaly.rank}
+          totalBuildings={anomaly.totalBuildings}
+          confidence={anomaly.confidence}
+          signals={anomaly.signals}
+        />
+        <InvestmentImpactCard
+          investmentScore={anomaly.investmentScore}
+          investmentStatus={anomaly.investmentStatus}
+          grossArea={building.grossArea}
+          overallScore={anomaly.overallScore}
+        />
+      </div>
+
+    
+      {/* 4. Method Comparison (full width) */}
+      {Object.keys(anomaly.scoresByMethod).length > 0 && (
+        <MethodComparisonCard
+          scoresByMethod={anomaly.scoresByMethod}
+          rank={anomaly.rank}
+          totalBuildings={anomaly.totalBuildings}
+        />
+      )}
+
+      {/* 5. Building Info + Utility Cards */}
+      <BuildingInfoCard building={building} />
+
+      
 
       {/* 7. Anomaly detail table */}
       {tsData?.data.length ? (

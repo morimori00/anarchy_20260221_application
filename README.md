@@ -21,7 +21,7 @@ Campus buildings experience similar external conditions — weather, seasonal de
 │  React + Vite    │◄────►│    FastAPI       │
 │  TypeScript      │ REST │    Python        │
 │  Tailwind CSS    │  +   │                  │
-│  shadcn/ui       │ SSE  │  XGBoost Model   │
+│  shadcn/ui       │ SSE  │  XGBoost Models   │
 │  mapcn (maps)    │      │  OpenAI GPT-4o   │
 └─────────────────┘      └─────────────────┘
      Port 3000                Port 8000
@@ -36,7 +36,7 @@ Campus buildings experience similar external conditions — weather, seasonal de
 |---|---|
 | Frontend | React, Vite, TypeScript, Tailwind CSS, shadcn/ui, mapcn, Recharts, Vercel AI SDK |
 | Backend | FastAPI, pandas, XGBoost, OpenAI API |
-| ML Model | XGBoost (gradient-boosted trees) — 25 features, predicts energy per sqft |
+| ML Model | XGBoost (gradient-boosted trees) , predicts energy(Electricity, Cooler, Heater, Steam...) per sqft |
 | Containers | Docker Compose (backend:8000, frontend:3000) |
 
 ## Data
@@ -145,12 +145,12 @@ The application uses three datasets covering ~60 days of campus energy data (Sep
 
 ## ML Model
 
-The XGBoost model predicts energy consumption per square foot using 25 features:
+The XGBoost model predicts energy consumption per square foot using 27 (25 for Electricity) features:
 
-- **Weather** (8): temperature, humidity, dew point, radiation, wind speed, cloud cover, apparent temperature, precipitation
-- **Building** (3): gross area, floors above ground, building age
-- **Temporal** (4): hour of day, minute of hour, day of week, is weekend
-- **Engineered** (10): lag features (1h, 6h, 24h, 1 week), rolling mean/std (24h, 1 week), interaction terms (temp x area, humidity x area)
+- **Weather** : temperature, humidity, dew point, radiation, wind speed, cloud cover, apparent temperature, precipitation
+- **Building** : gross area, floors above ground, building age
+- **Temporal** : hour of day, minute of hour, day of week, is weekend
+- **Engineered** : lag features (1h, 6h, 24h, 1 week), rolling mean/std (24h, 1 week), interaction terms (temp x area, humidity x area)
 
 Anomaly scores are computed from residuals (actual - predicted) using three selectable methods:
 - **Size-Normalized** (default) — Mean absolute residual per sqft, min-max normalized

@@ -575,6 +575,10 @@ export default function UploadData() {
     <div className="flex flex-col h-full">
       <PageHeader title="Upload Data" />
 
+      <div className="py-30">
+          <h1 className="text-xl">Add new meter, weather, or building data via CSV upload, manual entry, or weather API fetch (Open-Meteo).</h1>
+      </div>
+
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         {/* Status message */}
         {message && (

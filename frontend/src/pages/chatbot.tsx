@@ -81,7 +81,7 @@ export default function Chatbot() {
   return (
     <div className="flex flex-col items-center justify-between h-[calc(100vh-3.5rem)]">
       <Conversation>
-        <ConversationContent className="p-6 min-w-[700px]">
+        <ConversationContent className="p-6 min-w-[700px] max-w-[1000px]">
           {messages.length === 0 && !error ? (
             <EmptyState onSuggestionClick={handleSuggestionClick} />
           ) : (

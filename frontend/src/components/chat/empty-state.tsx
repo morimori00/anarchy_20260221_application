@@ -13,7 +13,7 @@ interface EmptyStateProps {
 export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center h-full text-center px-4">
-      <div className="rounded-full bg-primary/10 p-4 mb-6">
+      <div className="rounded-full bg-primary/10 p-4 mb-6 mt-20">
         <Sparkles className="size-8 text-primary" />
       </div>
       <h2 className="text-2xl font-semibold mb-2">Energy Analysis Assistant</h2>
