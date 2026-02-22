@@ -45,7 +45,7 @@ Data files are at /app/data/. In Python code, use the pre-loaded `data` object:
 - data.buildings  → "/app/data/building_metadata.csv"
 - data.weather    → "/app/data/weather-sept-oct-2025.csv"
 
-Libraries available: pandas (pd), numpy (np), matplotlib.pyplot (plt), seaborn (sns), scipy, xgboost.
+Libraries available: pandas (pd), numpy (np), matplotlib.pyplot (plt), scipy, xgboost.
 Use plt.show() (not plt.savefig()) for charts — figures are captured automatically.
 
 Followings are the detailed information about the data tables.
