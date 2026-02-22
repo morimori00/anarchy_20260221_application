@@ -35,7 +35,7 @@ class DataService:
             dfs.append(df)
         if dfs:
             self._meter_data = pd.concat(dfs, ignore_index=True)
-            self._meter_data["simscode"] = self._meter_data["simscode"].astype(int)
+            # self._meter_data["simscode"] = self._meter_data["simscode"].astype(int)
             self._meter_data["readingtime"] = pd.to_datetime(
                 self._meter_data["readingtime"], errors="coerce"
             )
