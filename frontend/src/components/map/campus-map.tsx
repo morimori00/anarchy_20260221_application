@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import type { BuildingMapData } from "@/types/building";
 import { useState, useEffect, useRef } from "react";
+import { useThresholds, type Thresholds } from "@/hooks/use-thresholds";
 
 type StyleKey = keyof typeof styles;
 
@@ -29,11 +30,11 @@ interface CampusMapProps {
   isInvestmentView?: boolean;
 }
 
-function getMarkerStyles(score: number | null): { bg: string; size: string } {
+function getMarkerStyles(score: number | null, thresholds: Thresholds): { bg: string; size: string } {
   const s = score ?? 0;
-  if (s >= 0.8) return { bg: "bg-red-500", size: "w-7 h-7" };
-  if (s >= 0.5) return { bg: "bg-orange-400", size: "w-6 h-6" };
-  if (s >= 0.3) return { bg: "bg-yellow-400", size: "w-5 h-5" };
+  if (s >= thresholds.anomaly) return { bg: "bg-red-500", size: "w-7 h-7" };
+  if (s >= thresholds.warning) return { bg: "bg-orange-400", size: "w-6 h-6" };
+  if (s >= thresholds.caution) return { bg: "bg-yellow-400", size: "w-5 h-5" };
   return { bg: "bg-emerald-500", size: "w-4 h-4" };
 }
 
@@ -55,6 +56,7 @@ function formatArea(area: number): string {
 export function CampusMap({ buildings, onBuildingClick, isInvestmentView = false }: CampusMapProps) {
   const mapRef = useRef<MapRef>(null);
   const [style, setStyle] = useState<StyleKey>("openstreetmap3d");
+  const { thresholds } = useThresholds();
   const selectedStyle = styles[style];
   const is3D = style === "openstreetmap3d";
 
@@ -93,10 +95,10 @@ export function CampusMap({ buildings, onBuildingClick, isInvestmentView = false
         const displayScore = isInvestmentView
           ? (building.investmentScore ?? 0)
           : (building.anomalyScore ?? 0);
-        const { bg } = getMarkerStyles(displayScore);
+        const { bg } = getMarkerStyles(displayScore, thresholds);
         const size = isInvestmentView
           ? getInvestmentMarkerSize(building.grossArea, allAreas)
-          : getMarkerStyles(displayScore).size;
+          : getMarkerStyles(displayScore, thresholds).size;
 
         return (
           <MapMarker
